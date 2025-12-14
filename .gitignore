@@ -1,0 +1,10 @@
+/.env
+/data
+/pipervoice/en/semaine
+/test_excited.wav
+/test_lazy.wav
+/test_german.wav
+/test_neutral.wav
+/test_serious.wav
+/.idea
+/__pycache__
