@@ -1,0 +1,99 @@
+# script.yaml
+# COMPLETE DATASET: Acting + German + Technical Calibration
+
+# --- SECTION 1: EMOTIONAL RANGE (The "Personality") ---
+
+- category: "A. Assistant (Neutral)"
+  acting: "Clear, polite, slightly smiling. Standard AI voice."
+  lang: "en"
+  lines:
+    - "Here is the summary of your notifications."
+    - "The weather in Vienna is currently 15 degrees."
+    - "I have updated your calendar for tomorrow morning."
+    - "Searching for that information now."
+    - "I can certainly help you with that request."
+
+- category: "B. Serious (Low Pitch)"
+  acting: "Lower pitch, slower speed, no smile. Concerned/Warning."
+  lang: "en"
+  lines:
+    - "I'm sorry, but I cannot complete that request right now."
+    - "Please be careful, the file you are deleting is important."
+    - "System critical error detected."
+    - "Are you sure you want to proceed with this action?"
+
+- category: "C. Excited (High Energy)"
+  acting: "Higher pitch, faster, energetic! Vary your volume."
+  lang: "en"
+  lines:
+    - "Wow! That worked perfectly on the first try!"
+    - "I have great news for you!"
+    - "That is an amazing result!"
+    - "Congratulations! The process is complete."
+
+- category: "D. Natural / Lazy (Anti-Robot)"
+  acting: "Slur words slightly, mumble, sound tired/bored. Drop 'g's."
+  lang: "en"
+  lines:
+    - "Yeah, I think that's... mostly correct, actually."
+    - "I'm just sitting here trying to fix this code, it's pretty annoying."
+    - "Ugh, I need coffee before I answer that."
+    - "Wait, did I leave the stove on?"
+    - "Honestly, I don't really know."
+    - "If we leave now, we can still catch the last train, right?"
+
+# --- SECTION 2: GERMAN (The "Accent Anchor") ---
+
+- category: "E. German (Viennese/Natural)"
+  acting: "Natural native accent. Don't do a 'Radio Voice'."
+  lang: "de"
+  lines:
+    - "Servus, das ist jetzt ein Test fuer die deutsche Stimme."
+    - "Ich glaube, das Wetter wird heute abend noch umschlagen."
+    - "Moment mal, das habe ich nicht ganz verstanden."
+    - "Ja, das passt schon so. Mach dir keine Sorgen."
+    - "Koennen wir das spaeter besprechen?"
+    - "Das System laeuft einwandfrei."
+    - "Also, ich weiss ehrlich gesagt nicht, ob das so funktioniert."
+
+# --- SECTION 3: CALIBRATION (The "Old Favorites") ---
+
+- category: "F. Harvard Sentences (Standard)"
+  acting: "Neutral, clear, consistent volume. (Gold Standard)"
+  lang: "en"
+  lines:
+    - "The birch canoe slid on the smooth planks."
+    - "Glue the sheet to the dark blue background."
+    - "It's easy to tell the depth of a well."
+    - "These days a chicken leg is a rare dish."
+    - "Rice is often served in round bowls."
+    - "The juice of lemons makes fine punch."
+    - "The box was thrown beside the parked truck."
+    - "The hogs were fed chopped corn and garbage."
+    - "Four hours of steady work faced us."
+    - "A large size in stockings is hard to sell."
+
+- category: "G. Pangrams (Articulation)"
+  acting: "Precise enunciation. Make sure every letter is clear."
+  lang: "en"
+  lines:
+    - "The quick brown fox jumps over the lazy dog."
+    - "Sphinx of black quartz, judge my vow."
+    - "Pack my box with five dozen liquor jugs."
+    - "How vexingly quick daft zebras jump."
+
+- category: "H. Storytelling (Narrative)"
+  acting: "Dramatic, good breath control. Paint a picture."
+  lang: "en"
+  lines:
+    - "The storm hit just as the sun dipped below the horizon, casting the sky in a fiery hue that quickly faded to black."
+    - "I gripped the worn wooden wheel, my knuckles white, my heart racing."
+
+- category: "I. Technical & Hard Sounds"
+  acting: "Fast but precise. Don't trip over the complex sounds."
+  lang: "en"
+  lines:
+    - "The algorithm processes the data in real-time, allowing for seamless integration."
+    - "She sells seashells by the seashore."
+    - "The string is strong and structured strictly."
+    - "Red lorry, yellow lorry, red leather, yellow leather."
