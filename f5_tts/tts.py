@@ -99,17 +99,18 @@ def tts_task(log_queue, selected_device, text_queue):
 
         # --- DYNAMIC SETTINGS ---
         if style == "excited":
-            # Excited needs LOWER freedom (CFG) to prevent "frying" the audio
-            current_cfg = 1.5
-            current_speed = 0.95 # Slightly slower helps stabilize rapid shouting
-        elif style == "lazy":
-            # Lazy needs HIGHER freedom to capture the monotone drawl
             current_cfg = 2.5
+            current_speed = 0.95 # Slightly slower helps stabilize rapid shouting
+        elif style == "serious":
+            current_cfg = 2.2
+            current_speed = 1.2
+        elif style == "lazy":
+            current_cfg = 2.2
             current_speed = 1.0
         else:
-            # Default for Neutral / Serious / German
+            # Default for Neutral / German
             current_cfg = 2.0
-            current_speed = 0.95
+            current_speed = 0.8
 
         if text.strip():
             log_queue.put({'type': 'status', 'text': f"🔊 Generating: {text[:30]}..."})
@@ -123,7 +124,7 @@ def tts_task(log_queue, selected_device, text_queue):
                     text,
                     model,
                     vocoder,
-                    nfe_step=64,
+                    nfe_step=32,
                     speed=current_speed,
                     cfg_strength=current_cfg,
                     device=device,

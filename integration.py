@@ -1,31 +1,38 @@
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, active_children
 from stt import stt_task
 from ai_ttt import ttt_task
 from tts import tts_task
-from console import console_process
-from sound import select_audio_device, get_valid_samplerate
+from console import console_process, signal_handler
+import sound
+import signal, time
 
 if __name__ == '__main__':
 
-    selected_device, native_sr = select_audio_device()
+    signal.signal(signal.SIGINT, signal_handler)
+
+    input_device, input_sr, output_device, output_sr = sound.select_audio_devices()
 
     stt_queue = Queue() # STT → AI
     ttt_queue = Queue() # AI → TTS
     log_queue = Queue()
 
-    log_queue.put({'type': 'info', 'text': f"[green]✅ Using Device: {selected_device} | Rate: {native_sr}Hz[/green]"})
+    log_queue.put({
+        'type': 'info',
+        'text': f"[green]✅ Input: {input_device} @ {input_sr}Hz | Output: {output_device} @ {output_sr}Hz[/green]"
+    })
 
-    p_console = Process(target=console_process, args=(log_queue,))
-    p_stt = Process(target=stt_task, args=(log_queue, selected_device, stt_queue,))
-    p_ttt = Process(target=ttt_task, args=(log_queue, stt_queue, ttt_queue))
-    p_tts = Process(target=tts_task, args=(log_queue, selected_device, ttt_queue,))
+    p_console = Process(target=console_process, args=(log_queue,), daemon=True)
+    p_stt = Process(target=stt_task, args=(log_queue, input_device, stt_queue,), daemon=True)
+    p_ttt = Process(target=ttt_task, args=(log_queue, stt_queue, ttt_queue), daemon=True)
+    p_tts = Process(target=tts_task, args=(log_queue, output_device, ttt_queue,), daemon=True)
 
     p_console.start()
     p_stt.start()
     p_tts.start()
     p_ttt.start()
 
-    p_console.join()
-    p_stt.join()
-    p_ttt.join()
-    p_tts.join()
+    try:
+        while True:
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        signal_handler(None, None)

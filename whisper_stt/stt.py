@@ -1,4 +1,5 @@
 import os
+import time
 import queue
 import tempfile
 from collections import deque
@@ -12,10 +13,9 @@ import sound
 
 
 def continuous_stt_task(log_queue, selected_device, text_queue):
-    """Listen and transcribe, put results in queue"""
+    """Listen and transcribe continuously with preroll"""
 
     # --- 1. LAZY IMPORT ---
-    # We import whisper here so it initializes CUDA only in this child process
     try:
         import whisper
     except ImportError:
@@ -27,8 +27,6 @@ def continuous_stt_task(log_queue, selected_device, text_queue):
     # --- 2. LOAD MODEL ---
     log_queue.put({'type': 'info', 'text': f"Loading Whisper model on {device} (PID: {os.getpid()})..."})
     try:
-        # You can force device="cpu" here if you want to save GPU for TTS,
-        # but "cuda" is fine if you have VRAM (approx 2GB for Small).
         model = whisper.load_model("small", device=device)
         log_queue.put({'type': 'info', 'text': "✅ Whisper Model Loaded."})
     except Exception as e:
@@ -39,10 +37,9 @@ def continuous_stt_task(log_queue, selected_device, text_queue):
 
     # Settings
     sample_rate = sound.get_valid_samplerate(selected_device)
-    silence_duration = 2.0
     chunk_duration = 0.1
     volume_percentile = 75
-    min_audio_length = 0.8  # Minimum audio length before transcription
+    min_audio_length = 0.8
 
     # Calibration
     def calibrate_noise_floor(duration):
@@ -53,7 +50,7 @@ def continuous_stt_task(log_queue, selected_device, text_queue):
         def callback(indata, frames, time, status):
             noise_samples.append(np.abs(indata).max())
 
-        with sd.InputStream(callback=callback, channels=1, samplerate=sample_rate, device=selected_device):
+        with sound.safe_open_stream(selected_device, sample_rate, callback=callback):
             sd.sleep(int(duration * 1000))
 
         noise_floor = np.percentile(noise_samples, 90)
@@ -65,8 +62,10 @@ def continuous_stt_task(log_queue, selected_device, text_queue):
     speech_threshold = current_noise_floor * 4.0
     silence_threshold = current_noise_floor * 2.5
 
-    # Initialize volume window
+    # Initialize buffers
+    silence_duration = 2.0
     volume_window = deque(maxlen=int(silence_duration / chunk_duration))
+    preroll_buffer = sound.create_preroll_buffer(sample_rate, chunk_duration)
 
     def audio_callback(indata, frames, time, status):
         audio_queue.put(indata.copy())
@@ -79,24 +78,38 @@ def continuous_stt_task(log_queue, selected_device, text_queue):
 
     buffer = []
     is_speaking = False
+    last_meter_update = time.time()
+    meter_update_interval = 0.2
 
-    with sd.InputStream(callback=audio_callback,
-                        channels=1,
-                        samplerate=sample_rate,
-                        device=selected_device,
-                        blocksize=int(sample_rate * chunk_duration)):
+    with sound.safe_open_stream(selected_device, sample_rate, callback=audio_callback,
+                                blocksize=int(sample_rate * chunk_duration)):
         log_queue.put({'type': 'info', 'text': "Whisper is listening... Start speaking!"})
+        log_queue.put({'type': 'info', 'text': f"Thresholds → Noise: {current_noise_floor:.3f} | Silence: {silence_threshold:.3f} | Speech: {speech_threshold:.3f}"})
 
         while True:
             audio_chunk = audio_queue.get()
             volume = np.abs(audio_chunk).max()
             volume_window.append(volume)
 
+            # Always fill preroll buffer
+            preroll_buffer.append(audio_chunk)
+
+            # Update volume meter periodically
+            current_time = time.time()
+            if current_time - last_meter_update > meter_update_interval:
+                meter = sound.create_volume_meter_rich(
+                    volume,
+                    current_noise_floor,
+                    silence_threshold,
+                    speech_threshold
+                )
+                log_queue.put({'type': 'meter', 'text': meter})
+                last_meter_update = current_time
+
             if volume > speech_threshold:
-                # Using \r for status updates prevents log spam
-                # Note: Sending too many updates to a multiprocessing queue can lag it.
-                # Consider reducing frequency if UI lags.
-                # log_queue.put({'type': 'status', 'text': f"\r🎤 Speaking: {volume:.3f}"})
+                if not is_speaking:
+                    # Just started speaking - dump preroll
+                    buffer.extend(list(preroll_buffer))
                 is_speaking = True
                 buffer.append(audio_chunk)
             elif is_speaking and volume > silence_threshold:
@@ -120,8 +133,6 @@ def continuous_stt_task(log_queue, selected_device, text_queue):
                     with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
                         sf.write(f.name, audio_data, sample_rate)
 
-                        # Actual Transcription
-                        # fp16=False prevents warnings on some CPUs, change to True if using GPU only
                         result = model.transcribe(f.name, language='en', fp16=torch.cuda.is_available())
                         transcribed_text = result['text'].strip()
 
@@ -131,7 +142,6 @@ def continuous_stt_task(log_queue, selected_device, text_queue):
                         else:
                             log_queue.put({'type': 'status', 'text': "🚫 Empty transcription"})
 
-                        # Cleanup temp file
                         try:
                             os.remove(f.name)
                         except:

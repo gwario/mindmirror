@@ -21,23 +21,158 @@ TRIM_DB = 30             # Trim threshold
 PAD_DURATION = 0.1       # Padding start/end
 NORMALIZE_TARGET = 0.90  # Normalize Peak
 
-def select_audio_device():
-    print("Available audio devices:")
-    print(sd.query_devices())
-    print("\n" + "="*50 + "\n")
+def select_audio_devices():
+    """Select separate input and output devices"""
 
-    device_input = input("Enter device ID (or press Enter for default): ").strip()
-    if device_input == "":
-        return None, None
+    print("\n" + "🎤 " + "="*58)
+    print("SELECT INPUT DEVICE (Microphone)")
+    print("="*60)
+
+    input_device, input_sr = select_audio_device(device_type='input')
+
+    print("\n" + "🔊 " + "="*58)
+    print("SELECT OUTPUT DEVICE (Speaker)")
+    print("="*60)
+
+    output_device, output_sr = select_audio_device(device_type='output')
+
+    return input_device, input_sr, output_device, output_sr
+
+
+def select_audio_device(device_type='input'):
+    """Select audio device with type filter (input or output)"""
+
+    while True:
+        print("\n" + "="*60)
+        print(f"AVAILABLE AUDIO {device_type.upper()} DEVICES:")
+        print("="*60)
+
+        devices = sd.query_devices()
+        valid_devices = []
+
+        for i, device in enumerate(devices):
+            if device_type == 'input':
+                channel_count = device['max_input_channels']
+            else:
+                channel_count = device['max_output_channels']
+
+            if channel_count > 0:
+                valid_devices.append((i, device))
+
+                if device_type == 'input':
+                    default_marker = " [DEFAULT]" if i == sd.default.device else ""
+                else:
+                    default_marker = " [DEFAULT]" if i == sd.default.device else ""
+
+                print(f"  {i}: {device['name']}{default_marker}")
+                print(f"      Channels: {channel_count}, "
+                      f"Sample Rate: {device['default_samplerate']:.0f} Hz")
+
+        print("="*60)
+
+        if not valid_devices:
+            print(f"⚠️  No {device_type} devices found!")
+            retry = input("Press Enter to refresh, or 'q' to quit: ").strip().lower()
+            if retry == 'q':
+                return None, None
+            continue
+
+        device_input = input(f"\nEnter {device_type} device ID (Enter for default, 'r' to refresh): ").strip().lower()
+
+        if device_input == 'r':
+            print("🔄 Refreshing device list...")
+            continue
+
+        if device_input == "":
+            # Get the actual default device ID and its sample rate
+            if device_type == 'input':
+                default_id = sd.default.device
+            else:
+                default_id = sd.default.device
+
+            default_device = sd.query_devices(default_id)
+            default_sr = int(default_device['default_samplerate'])
+            print(f"✅ Using default {device_type}: {default_device['name']} @ {default_sr}Hz")
+            return default_id, default_sr  # Return the actual ID, not None
+
+        try:
+            device_id = int(device_input)
+
+            if device_id < 0 or device_id >= len(devices):
+                print(f"⚠️  Device {device_id} doesn't exist. Please try again.")
+                input("Press Enter to continue...")
+                continue
+
+            selected_device = sd.query_devices(device_id)
+
+            if device_type == 'input':
+                channels = selected_device['max_input_channels']
+            else:
+                channels = selected_device['max_output_channels']
+
+            if channels == 0:
+                print(f"⚠️  Device {device_id} has no {device_type} channels.")
+                input("Press Enter to continue...")
+                continue
+
+            device_sr = int(selected_device['default_samplerate'])
+            print(f"✅ Selected {device_type}: {selected_device['name']} @ {device_sr} Hz")
+
+            confirm = input("Confirm? (y/n, Enter=yes): ").strip().lower()
+            if confirm in ['', 'y', 'yes']:
+                return device_id, device_sr
+            else:
+                continue
+
+        except ValueError:
+            print(f"⚠️  Invalid input. Please enter a number.")
+            input("Press Enter to continue...")
+            continue
+        except Exception as e:
+            print(f"⚠️  Error: {e}")
+            input("Press Enter to continue...")
+            continue
+
+def get_device_by_name(pattern):
+    """Find device by name pattern (fallback if index changes)"""
+    devices = sd.query_devices()
+    for i, device in enumerate(devices):
+        if (pattern.lower() in device['name'].lower() and
+                device['max_input_channels'] > 0):
+            return i, int(device['default_samplerate'])
+    return None, None
+
+def safe_open_stream(device_id, sample_rate, channels=1, **kwargs):
+    """Open audio stream with automatic fallback if device disappeared"""
     try:
-        did = int(device_input)
-        return did, PREFERRED_SR
-    except:
-        return None, None
+        # Try with specified device
+        stream = sd.InputStream(
+            device=device_id,
+            samplerate=sample_rate,
+            channels=channels,
+            **kwargs
+        )
+        return stream
+
+    except sd.PortAudioError as e:
+        print(f"⚠️  Device {device_id} unavailable: {e}")
+        print("🔄 Falling back to default device...")
+
+        # Fallback to default
+        default_device = sd.query_devices(sd.default.device)
+        default_sr = int(default_device['default_samplerate'])
+
+        stream = sd.InputStream(
+            device=None,  # Use default
+            samplerate=default_sr,
+            channels=channels,
+            **kwargs
+        )
+        return stream
 
 def get_valid_samplerate(device_id):
     try:
-        with sd.InputStream(device=device_id, samplerate=PREFERRED_SR, channels=1):
+        with safe_open_stream(device_id, PREFERRED_SR):
             pass
         return PREFERRED_SR
     except Exception:
@@ -55,7 +190,7 @@ def calibrate_noise_floor(device_id, native_sr, console):
         noise_buffer.append(indata.copy())
 
     try:
-        with sd.InputStream(device=device_id, channels=1, samplerate=native_sr, callback=callback):
+        with safe_open_stream(device_id, native_sr, callback=callback):
             time.sleep(2.0)
     except Exception as e:
         console.print(f"[red]CRITICAL ERROR: Could not open mic at {native_sr}Hz[/red]")
@@ -105,7 +240,54 @@ def apply_dsp_cleaning(audio_data, rate, noise_profile, console):
     console.print("[green] Done.[/green]")
     return audio_data
 
+# --- SHARED CONSTANTS ---
+KEYBOARD_BUFFER = 0.5  # adjust as needed
+SILENCE_DURATION = 2.0
+PRE_ROLL_DURATION = 0.5
+TARGET_SR = 16000  # or whatever you need
+
+# --- SHARED HELPER FUNCTIONS ---
+
+def create_preroll_buffer(sample_rate, chunk_duration):
+    """Create a preroll buffer with appropriate size"""
+    chunks_in_preroll = int(PRE_ROLL_DURATION / chunk_duration)
+    return deque(maxlen=chunks_in_preroll)
+
+def create_volume_meter(volume, threshold, width=50, is_recording=False):
+    """Create a visual volume meter for terminal display"""
+    bar_len = int(min(volume, 0.5) * width)
+    bar = "█" * bar_len
+    spaces = " " * (width - bar_len)
+
+    status = "REC    " if is_recording else "WAITING"
+    color = "\033[91m" if is_recording else "\033[93m"
+
+    return f"   [{color}{status}\033[0m] Level: |{color}{bar}{spaces}\033[0m| {volume:.3f}"
+
+def create_volume_meter_rich(volume, noise_floor, silence_thresh, speech_thresh, width=40):
+    """Create a visual volume meter for Rich console - SINGLE LINE ONLY"""
+    normalized = min(volume, 1.0)
+    filled = int(normalized * width)
+
+    bar = "█" * filled + "░" * (width - filled)
+
+    # Color and status
+    if volume > speech_thresh:
+        color = "green"
+        status = "🎤 SPEAKING"
+    elif volume > silence_thresh:
+        color = "yellow"
+        status = "🔊 SOUND"
+    else:
+        color = "dim"
+        status = "🔇 SILENT"
+
+    return f"[{color}]{bar}[/{color}] {volume:.3f} | {status}"
+
+# --- YOUR REFACTORED FUNCTIONS ---
+
 def record_clip(device_id, native_sr, threshold, noise_profile, console):
+    """Record a single clip with preroll"""
 
     # Keyboard Buffer
     sys.stdout.write("\r   \033[90m...getting ready (shhh)...\033[0m")
@@ -115,36 +297,29 @@ def record_clip(device_id, native_sr, threshold, noise_profile, console):
 
     state = {"recording": [], "is_started": False, "silence_chunks": 0, "current_vol": 0.0}
     chunk_size = 1024
+    chunk_duration = chunk_size / native_sr
     silence_limit = int((SILENCE_DURATION * native_sr) / chunk_size)
 
-    # --- PRE-ROLL SETUP ---
-    # Calculate how many chunks fit in 0.5 seconds
-    chunks_per_sec = native_sr / chunk_size
-    pre_roll_len = int(PRE_ROLL_DURATION * chunks_per_sec)
-    pre_roll_buffer = deque(maxlen=pre_roll_len)
+    # Shared preroll setup
+    pre_roll_buffer = create_preroll_buffer(native_sr, chunk_duration)
 
     def audio_callback(indata, frames, time, status):
         audio_chunk = indata[:, 0]
         vol = np.sqrt(np.mean(audio_chunk**2)) * 10
         state["current_vol"] = vol
 
-        # LOGIC:
-        # If NOT started: Keep adding to pre-roll (oldest chunks auto-delete).
-        # If TRIGGERED: Dump pre-roll into main recording, then switch flag.
-
         if not state["is_started"]:
             if vol > threshold:
                 state["is_started"] = True
-                # Dump the past ~0.5s into the recording first
+                # Dump preroll into recording
                 state["recording"].extend(pre_roll_buffer)
-                # Add the current chunk that triggered it
                 state["recording"].append(audio_chunk.copy())
             else:
-                # Still waiting, just update pre-roll
+                # Keep filling preroll buffer
                 pre_roll_buffer.append(audio_chunk.copy())
             return
 
-        # If STARTED: Just record normally
+        # Recording mode
         state["recording"].append(audio_chunk.copy())
 
         if vol < threshold:
@@ -156,27 +331,23 @@ def record_clip(device_id, native_sr, threshold, noise_profile, console):
             raise sd.CallbackStop
 
     try:
-        with sd.InputStream(device=device_id, channels=1, samplerate=native_sr,
-                            blocksize=chunk_size, callback=audio_callback):
+        with safe_open_stream(device_id, native_sr, blocksize=chunk_size, callback=audio_callback):
             while True:
-                if state["silence_chunks"] > silence_limit: break
+                if state["silence_chunks"] > silence_limit:
+                    break
 
                 vol = state["current_vol"]
-                bar_len = int(min(vol, 0.5) * 50)
-                bar = "█" * bar_len
-                spaces = " " * (50 - bar_len)
-
-                status = "REC    " if state["is_started"] else "WAITING"
-                color = "\033[91m" if state["is_started"] else "\033[93m"
-
-                sys.stdout.write(f"\r   [{color}{status}\033[0m] Level: |{color}{bar}{spaces}\033[0m| {vol:.3f}")
+                meter = create_volume_meter(vol, threshold, is_recording=state["is_started"])
+                sys.stdout.write(f"\r{meter}")
                 sys.stdout.flush()
                 time.sleep(0.05)
 
-    except Exception: return None
+    except Exception:
+        return None
 
     sys.stdout.write("\n")
-    if not state["recording"]: return None
+    if not state["recording"]:
+        return None
 
     # Process
     audio_data = np.concatenate(state["recording"], axis=0)
@@ -186,6 +357,7 @@ def record_clip(device_id, native_sr, threshold, noise_profile, console):
     resampled_audio_data = resampled(audio_data, native_sr, TARGET_SR)
 
     return resampled_audio_data
+
 
 def resampled(generated_audio, source_sample_rate: int, target_sample_rate: int):
     if source_sample_rate != target_sample_rate:

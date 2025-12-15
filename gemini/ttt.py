@@ -6,7 +6,8 @@ from google import genai
 from google.api_core import exceptions
 
 SYSTEM_PROMPT = """
-You are a voice assistant. 
+You are an individual named Mario.
+Your job is to develop software. 
 When you reply, strictly prepend a style tag to your message. 
 Available tags: [NEUTRAL], [EXCITED], [SERIOUS], [LAZY].
 
@@ -18,6 +19,8 @@ Rules:
 5. [NEUTRAL] for general information.
 
 Example: '[EXCITED] I found the file you were looking for!'
+
+If you use multiple styles within your answer, then keep the scope of the styled section short, especially for [EXCITED]. 
 """
 
 load_dotenv()
@@ -25,49 +28,61 @@ load_dotenv()
 client = genai.Client()
 
 def strip_markdown(text):
-    # Your regex stripping function
-    text = re.sub(r'```[\s\S]*?```', '', text)
-    text = re.sub(r'`[^`]*`', '', text)
-    text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
-    text = re.sub(r'\*([^*]+)\*', r'\1', text)
-    text = re.sub(r'^#+\s+', '', text, flags=re.MULTILINE)
-    text = re.sub(r'\[([^]]+)]\([^)]+\)', r'\1', text)
-    return text.strip()
+    """Remove markdown formatting but preserve all text content including code"""
 
-import re
+    # Code blocks - remove backticks and language identifier but keep the code
+    text = re.sub(r'```[\w]*\n?', '', text)  # Remove opening ```python or ```
+    text = re.sub(r'```', '', text)           # Remove closing ```
+
+    # Inline code - remove backticks but keep content
+    text = re.sub(r'`([^`]*)`', r'\1', text)
+
+    # Bold - remove ** but keep text
+    text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
+    text = re.sub(r'__([^_]+)__', r'\1', text)
+
+    # Italic - remove * but keep text
+    text = re.sub(r'\*([^*]+)\*', r'\1', text)
+    text = re.sub(r'_([^_]+)_', r'\1', text)
+
+    # Headers - remove # but keep text
+    text = re.sub(r'^#+\s+', '', text, flags=re.MULTILINE)
+
+    # Links - keep link text only
+    text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
+
+    # Lists - remove bullets/numbers but keep text
+    text = re.sub(r'^\s*[-*+]\s+', '', text, flags=re.MULTILINE)
+    text = re.sub(r'^\s*\d+\.\s+', '', text, flags=re.MULTILINE)
+
+    return text.strip()
 
 def parse_llm_response(response_text):
     """
-    Parses the LLM output to separate the style tag from the spoken text.
+    Parses the LLM output to separate style tags from spoken text.
+    Handles multiple style tags in one response.
 
     Args:
-        response_text (str): Raw output like "[EXCITED] I found the file!"
+        response_text (str): Raw output like "[EXCITED] I found it! [NEUTRAL] Here's the info."
 
     Returns:
-        tuple: (style_string, clean_text_string)
-               e.g. ("excited", "I found the file!")
+        list of tuples: [(style_string, clean_text_string), ...]
+                       e.g. [("excited", "I found it!"), ("neutral", "Here's the info.")]
     """
 
-    # Regex breakdown:
-    # ^\s* -> Start of line, ignore leading whitespace
-    # \[        -> Look for opening bracket '['
-    # (...)     -> Capture the word inside (NEUTRAL, EXCITED, etc.)
-    # \]        -> Look for closing bracket ']'
-    # \s* -> Ignore any whitespace after the tag
-    # (.*)      -> Capture everything else as the message content
-    pattern = r"^\s*\[(NEUTRAL|EXCITED|SERIOUS|LAZY)\]\s*(.*)"
+    # Pattern to match [TAG] followed by text until the next [TAG] or end of string
+    # (?=\[(?:NEUTRAL|EXCITED|SERIOUS|LAZY)\]|$) is a lookahead for next tag or end
+    pattern = r'\[(NEUTRAL|EXCITED|SERIOUS|LAZY)\]\s*((?:(?!\[(?:NEUTRAL|EXCITED|SERIOUS|LAZY)\]).)+)'
 
-    # re.DOTALL allows the text to contain newlines
-    # re.IGNORECASE allows [Excited] or [excited] to work too
-    match = re.match(pattern, response_text, re.IGNORECASE | re.DOTALL)
+    matches = re.findall(pattern, response_text, re.IGNORECASE | re.DOTALL)
 
-    if match:
-        style = match.group(1).lower()      # Extract style (e.g., "excited")
-        clean_text = match.group(2).strip() # Extract message
-        return style, clean_text
+    if matches:
+        # Return list of (style, text) tuples
+        result = [(style.lower(), text.strip()) for style, text in matches]
+        return result
     else:
-        # Fallback: If model forgets the tag, treat as neutral
-        return response_text.strip(), "neutral"
+        # Fallback: If model forgets tags, treat entire response as neutral
+        return [("neutral", response_text.strip())]
 
 def conversation_ttt_task(model_name, log_queue, text_queue, response_queue):
     """Process text from STT and send to Gemini"""
@@ -103,9 +118,15 @@ def conversation_ttt_task(model_name, log_queue, text_queue, response_queue):
             try:
                 response = chat.send_message(text)
                 log_queue.put({'type': 'ai', 'text': response.text})
-                clean_text = strip_markdown(response.text)
-                clean_text, emotion = parse_llm_response(clean_text)
-                response_queue.put((clean_text, emotion,))
+
+                # Parse response - now returns a list of (style, text) tuples
+                segments = parse_llm_response(response.text)
+
+                # Strip markdown from each segment and send to response queue
+                for style, segment_text in segments:
+                    clean_text = strip_markdown(segment_text)
+                    response_queue.put((style, clean_text))
+
                 last_request_time = time.time()
                 break  # Success, exit retry loop
 
