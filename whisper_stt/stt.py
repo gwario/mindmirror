@@ -1,156 +1,106 @@
-import os
 import time
 import queue
-import tempfile
+import os
 from collections import deque
-import torch
-
 import numpy as np
-import sounddevice as sd
-import soundfile as sf
-
+import sys
+from pathlib import Path
+from .config import (
+    LOCK_FILE, CHUNK_DURATION, MIN_AUDIO_LENGTH, SILENCE_DURATION,
+    SPEECH_THRESHOLD_MULTIPLIER, SILENCE_THRESHOLD_MULTIPLIER
+)
+from .vad import calibrate_noise_floor, is_window_silent, get_volume
+from .transcriber import load_whisper_model, transcribe_audio
+sys.path.append(str(Path(__file__).resolve().parent.parent))
 import sound
 
+def stt_task(log_queue, selected_device, text_queue):
 
-def continuous_stt_task(log_queue, selected_device, text_queue):
-    """Listen and transcribe continuously with preroll"""
+    # 1. SETUP MODEL
+    model, device = load_whisper_model(log_queue)
+    if not model:
+        return # Exit if load failed
 
-    # --- 1. LAZY IMPORT ---
-    try:
-        import whisper
-    except ImportError:
-        log_queue.put({'type': 'error', 'text': "Could not import whisper. Is it installed?"})
-        return
-
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-
-    # --- 2. LOAD MODEL ---
-    log_queue.put({'type': 'info', 'text': f"Loading Whisper model on {device} (PID: {os.getpid()})..."})
-    try:
-        model = whisper.load_model("small", device=device)
-        log_queue.put({'type': 'info', 'text': "✅ Whisper Model Loaded."})
-    except Exception as e:
-        log_queue.put({'type': 'error', 'text': f"Failed to load Whisper: {e}"})
-        return
-
-    audio_queue = queue.Queue()
-
-    # Settings
     sample_rate = sound.get_valid_samplerate(selected_device)
-    chunk_duration = 0.1
-    volume_percentile = 75
-    min_audio_length = 0.8
 
-    # Calibration
-    def calibrate_noise_floor(duration):
-        """Record ambient noise to set baseline"""
-        log_queue.put({'type': 'info', 'text': f"Calibrating... Stay quiet for {duration} seconds..."})
-        noise_samples = []
+    # 2. CALIBRATION
+    noise_floor = calibrate_noise_floor(selected_device, sample_rate, log_queue=log_queue)
+    speech_thresh = noise_floor * SPEECH_THRESHOLD_MULTIPLIER
+    silence_thresh = noise_floor * SILENCE_THRESHOLD_MULTIPLIER
 
-        def callback(indata, frames, time, status):
-            noise_samples.append(np.abs(indata).max())
-
-        with sound.safe_open_stream(selected_device, sample_rate, callback=callback):
-            sd.sleep(int(duration * 1000))
-
-        noise_floor = np.percentile(noise_samples, 90)
-        log_queue.put({'type': 'info', 'text': f"Noise floor detected: {noise_floor:.3f}"})
-        return noise_floor
-
-    # Calibrate
-    current_noise_floor = calibrate_noise_floor(3)
-    speech_threshold = current_noise_floor * 4.0
-    silence_threshold = current_noise_floor * 2.5
-
-    # Initialize buffers
-    silence_duration = 2.0
-    volume_window = deque(maxlen=int(silence_duration / chunk_duration))
-    preroll_buffer = sound.create_preroll_buffer(sample_rate, chunk_duration)
-
-    def audio_callback(indata, frames, time, status):
-        audio_queue.put(indata.copy())
-
-    def is_silent():
-        """Check if most of the window is silent"""
-        if len(volume_window) < volume_window.maxlen:
-            return False
-        return np.percentile(volume_window, volume_percentile) < silence_threshold
+    # 3. STATE
+    audio_queue = queue.Queue()
+    preroll_buffer = sound.create_preroll_buffer(sample_rate, CHUNK_DURATION)
+    volume_window = deque(maxlen=int(SILENCE_DURATION / CHUNK_DURATION))
 
     buffer = []
     is_speaking = False
-    last_meter_update = time.time()
-    meter_update_interval = 0.2
+    last_meter_time = 0
 
+    # 4. CALLBACK
+    def audio_callback(indata, frames, time, status):
+        audio_queue.put(indata.copy())
+
+    # 5. MAIN LOOP
     with sound.safe_open_stream(selected_device, sample_rate, callback=audio_callback,
-                                blocksize=int(sample_rate * chunk_duration)):
-        log_queue.put({'type': 'info', 'text': "Whisper is listening... Start speaking!"})
-        log_queue.put({'type': 'info', 'text': f"Thresholds → Noise: {current_noise_floor:.3f} | Silence: {silence_threshold:.3f} | Speech: {speech_threshold:.3f}"})
+                                blocksize=int(sample_rate * CHUNK_DURATION)):
+
+        log_queue.put({'type': 'info', 'text': "👂 Listening..."})
 
         while True:
-            audio_chunk = audio_queue.get()
-            volume = np.abs(audio_chunk).max()
+            # --- A. LOCK CHECK ---
+            if os.path.exists(LOCK_FILE):
+                with audio_queue.mutex: audio_queue.queue.clear()
+                buffer = []; is_speaking = False; volume_window.clear()
+                time.sleep(0.1)
+                continue
+
+            # --- B. PROCESS AUDIO ---
+            try:
+                chunk = audio_queue.get(timeout=0.5)
+            except queue.Empty:
+                continue
+
+            volume = get_volume(chunk)
             volume_window.append(volume)
+            preroll_buffer.append(chunk)
 
-            # Always fill preroll buffer
-            preroll_buffer.append(audio_chunk)
-
-            # Update volume meter periodically
-            current_time = time.time()
-            if current_time - last_meter_update > meter_update_interval:
-                meter = sound.create_volume_meter_rich(
-                    volume,
-                    current_noise_floor,
-                    silence_threshold,
-                    speech_threshold
-                )
+            # Update UI Meter
+            if time.time() - last_meter_time > 0.2:
+                meter = sound.create_volume_meter_rich(volume, noise_floor, silence_thresh, speech_thresh)
                 log_queue.put({'type': 'meter', 'text': meter})
-                last_meter_update = current_time
+                last_meter_time = time.time()
 
-            if volume > speech_threshold:
+            # --- C. VAD ---
+            if volume > speech_thresh:
                 if not is_speaking:
-                    # Just started speaking - dump preroll
                     buffer.extend(list(preroll_buffer))
                 is_speaking = True
-                buffer.append(audio_chunk)
-            elif is_speaking and volume > silence_threshold:
-                buffer.append(audio_chunk)
+                buffer.append(chunk)
 
-            # Check if we should transcribe
-            if is_speaking and is_silent() and len(buffer) > 0:
-                # Check minimum audio length
-                audio_duration = len(buffer) * chunk_duration
-                if audio_duration < min_audio_length:
-                    log_queue.put({'type': 'status', 'text': f"🚫 Too short ({audio_duration:.1f}s)"})
-                    buffer = []
-                    is_speaking = False
-                    volume_window.clear()
-                    continue
+            elif is_speaking and volume > silence_thresh:
+                buffer.append(chunk)
 
-                log_queue.put({'type': 'status', 'text': "⏳ Transcribing..."})
-                audio_data = np.concatenate(buffer)
+            # --- D. END OF SPEECH ---
+            if is_speaking and is_window_silent(volume_window, silence_thresh):
+                if len(buffer) > 0:
+                    duration = len(buffer) * CHUNK_DURATION
 
-                try:
-                    with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
-                        sf.write(f.name, audio_data, sample_rate)
+                    if duration < MIN_AUDIO_LENGTH:
+                        log_queue.put({'type': 'status', 'text': f"🚫 Noise ({duration:.1f}s)"})
+                    else:
+                        # --- E. TRANSCRIBE (Functional Call) ---
+                        log_queue.put({'type': 'status', 'text': "⏳ Transcribing..."})
+                        full_audio = np.concatenate(buffer)
 
-                        result = model.transcribe(f.name, language='en', fp16=torch.cuda.is_available())
-                        transcribed_text = result['text'].strip()
+                        # Pass model and device explicitly
+                        text = transcribe_audio(model, full_audio, sample_rate, device, log_queue)
 
-                        if transcribed_text:
-                            log_queue.put({'type': 'user', 'text': transcribed_text})
-                            text_queue.put(transcribed_text)
+                        if text:
+                            log_queue.put({'type': 'user', 'text': text})
+                            text_queue.put(text)
                         else:
-                            log_queue.put({'type': 'status', 'text': "🚫 Empty transcription"})
+                            log_queue.put({'type': 'status', 'text': "🚫 Empty"})
 
-                        try:
-                            os.remove(f.name)
-                        except:
-                            pass
-
-                except Exception as e:
-                    log_queue.put({'type': 'error', 'text': f"Transcribe Error: {e}"})
-
-                # Reset
-                buffer = []
-                is_speaking = False
-                volume_window.clear()
+                    # Reset
+                    buffer = []; is_speaking = False; volume_window.clear()

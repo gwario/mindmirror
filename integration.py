@@ -1,10 +1,12 @@
-from multiprocessing import Process, Queue, active_children
-from stt import stt_task
-from ai_ttt import ttt_task
-from tts import tts_task
-from console import console_process, signal_handler
+import signal
+import time
+from multiprocessing import Process, Queue
+
 import sound
-import signal, time
+from ai_ttt import ttt_task
+from console import console_process, signal_handler
+from stt import stt_task
+from tts import tts_task
 
 if __name__ == '__main__':
 

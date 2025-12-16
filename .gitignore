@@ -7,4 +7,7 @@
 /test_neutral.wav
 /test_serious.wav
 /.idea
-/__pycache__
+__pycache__/
+*.py[cod]
+/audio_buffer
+speaking.lock
