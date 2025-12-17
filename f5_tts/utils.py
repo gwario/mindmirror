@@ -16,6 +16,7 @@ def split_into_sentences(text):
     # (?<=[.?!]) keeps the punctuation attached to the sentence
     raw_sentences = re.split(r'(?<=[.?!])\s+', text)
     raw_sentences = [s.strip() for s in raw_sentences if s.strip()]
+    raw_sentences = [s.replace('!','.') for s in raw_sentences]
 
     final_chunks = []
     current_buffer = ""

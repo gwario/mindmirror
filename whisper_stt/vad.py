@@ -1,38 +1,43 @@
 import numpy as np
-import sounddevice as sd
-from .config import VOLUME_PERCENTILE
+from collections import deque
+from .config import (
+    SPEECH_THRESHOLD_MULTIPLIER,
+    SILENCE_THRESHOLD_MULTIPLIER,
+    MIN_NOISE_FLOOR,
+    INITIAL_NOISE_FLOOR
+)
 
+class VADEngine:
+    def __init__(self):
+        self.noise_window = deque(maxlen=100)
+        self.noise_window.append(INITIAL_NOISE_FLOOR)
 
-def calibrate_noise_floor(device, sample_rate, duration=3.0, log_queue=None):
-    """
-    Records ambient noise for a few seconds to determine the baseline.
-    """
-    if log_queue:
-        log_queue.put({'type': 'info', 'text': f"Calibrating... Stay quiet for {duration}s..."})
+    def process_chunk(self, audio_chunk, adapt=True):
+        """
+        Returns: (is_speech, is_silence, rms, noise_floor)
+        adapt: If False, threshold is calculated but noise floor is NOT updated.
+        """
+        # 1. Calculate Energy
+        rms = np.std(audio_chunk)
+        if rms < 1e-7:
+            return False, True, 0.0, self.get_noise_floor()
 
-    noise_samples = []
+        # 2. Update Background Noise Model
+        if adapt:
+            self.noise_window.append(rms)
 
-    def callback(indata, frames, time, status):
-        noise_samples.append(np.abs(indata).max())
+        noise_floor = self.get_noise_floor()
 
-    with sd.InputStream(device=device, channels=1, samplerate=sample_rate, callback=callback):
-        sd.sleep(int(duration * 1000))
+        # 3. Decision
+        # Ensure thresholds never drop below practical limits
+        speech_thresh = max(noise_floor * SPEECH_THRESHOLD_MULTIPLIER, MIN_NOISE_FLOOR * 2)
+        silence_thresh = max(noise_floor * SILENCE_THRESHOLD_MULTIPLIER, MIN_NOISE_FLOOR)
 
-    # We take the 90th percentile to ignore random loud pops
-    noise_floor = np.percentile(noise_samples, 90)
+        is_speech = rms > speech_thresh
+        is_silence = rms < silence_thresh
 
-    if log_queue:
-        log_queue.put({'type': 'info', 'text': f"Noise floor detected: {noise_floor:.4f}"})
+        return is_speech, is_silence, rms, noise_floor
 
-    return noise_floor
-
-def is_window_silent(volume_window, silence_threshold):
-    """
-    Returns True if the majority of the recent audio history is below the threshold.
-    """
-    if len(volume_window) < volume_window.maxlen:
-        return False
-    return np.percentile(volume_window, VOLUME_PERCENTILE) < silence_threshold
-
-def get_volume(audio_chunk):
-    return np.abs(audio_chunk).max()
+    def get_noise_floor(self):
+        # 10th percentile rule + absolute minimum floor
+        return max(np.percentile(self.noise_window, 10), MIN_NOISE_FLOOR)
