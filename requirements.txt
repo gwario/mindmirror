@@ -227,7 +227,7 @@ typing_extensions==4.15.0
 tzdata==2025.2
 Unidecode==1.4.0
 uri-template==1.2.0
-urllib3==2.6.2
+urllib3==2.6.3
 uvicorn==0.38.0
 vocos==0.1.0
 wandb==0.23.1
