@@ -45,7 +45,7 @@ executing==1.2.0
 fastapi==0.124.4
 fastjsonschema==2.16.2
 ffmpy==1.0.0
-filelock==3.20.0
+filelock==3.20.3
 flatbuffers==25.9.23
 fonttools==4.61.1
 fqdn==1.5.1
