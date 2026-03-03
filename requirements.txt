@@ -62,7 +62,7 @@ google-crc32c==1.8.0rc3
 google-genai==1.55.0
 google-resumable-media==2.8.0
 googleapis-common-protos==1.72.0
-gradio==5.50.0
+gradio==6.7.0
 gradio_client==1.14.0
 groovy==0.1.2
 h11==0.16.0
