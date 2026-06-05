@@ -7,8 +7,11 @@ import yaml
 from rich.markdown import Markdown
 from rich.panel import Panel
 
-import sound
-from ui import console
+sys.path.append(str(Path(__file__).resolve().parent.parent / "src"))
+
+from mindmirror import audio
+from mindmirror.ui.ui import console
+from mindmirror import config
 
 # ================= CONFIGURATION =================
 VOICE="MyVoice"
@@ -44,13 +47,13 @@ def main():
             })
 
     # 3. Hardware Setup (Via Engine)
-    device_id, _ = sound.select_audio_device()
-    native_sr = sound.get_valid_samplerate(device_id)
+    device_id, _ = audio.select_audio_device()
+    native_sr = audio.get_valid_samplerate(device_id)
 
     console.print(f"[green]✅ Using Device: {device_id} | Rate: {native_sr}Hz[/green]")
 
     # 4. Calibration (Via Engine)
-    thresh, noise_profile = sound.calibrate_noise_floor(device_id, native_sr, console)
+    thresh, noise_profile = audio.calibrate_noise_floor(device_id, native_sr, console)
 
     # 5. Main Recording Loop
     existing_files = set(os.listdir(WAVS_DIR))
@@ -66,14 +69,14 @@ def main():
 
         while True:
             # Record (Passes control to audio sound)
-            audio = sound.record_clip(device_id, native_sr, thresh, noise_profile, console)
+            audio_clip = audio.record_clip(device_id, native_sr, thresh, noise_profile, console)
 
-            if audio is None:
+            if audio_clip is None:
                 console.print("[yellow]No audio detected. Try again.[/yellow]")
                 continue
 
             console.print("[blue]▶️ Check playback...[/blue]")
-            sd.play(audio, sound.TARGET_SR)
+            sd.play(audio_clip, config.TARGET_SR)
             sd.wait()
 
             choice = input("💾 [Enter] Save | [r]etry | [s]kip: ").lower()
@@ -82,7 +85,7 @@ def main():
 
             # Save
             path = os.path.join(WAVS_DIR, item['fname'])
-            sf.write(path, audio, sound.TARGET_SR)
+            sf.write(path, audio_clip, config.TARGET_SR)
 
             # Write Metadata
             # Note: F5-TTS usually expects relative paths like 'wavs/file.wav'

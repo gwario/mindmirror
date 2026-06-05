@@ -1,5 +1,5 @@
 import sys
-from .config import F5_LIB_PATH, CKPT_PATH, VOCAB_FILE
+from mindmirror.config import F5_LIB_PATH, F5_CKPT_PATH as CKPT_PATH, F5_VOCAB_FILE as VOCAB_FILE
 
 def load_f5_model(log_queue, device):
     """

@@ -2,18 +2,6 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.markdown import Markdown
 import sys
-from multiprocessing import active_children
-
-def signal_handler(sig, frame):
-    """Handle Ctrl+C gracefully"""
-    print("\n🛑 Shutting down...")
-    # Terminate all child processes
-    for process in active_children():
-        process.terminate()
-        process.join(timeout=2)
-        if process.is_alive():
-            process.kill()
-    sys.exit(0)
 
 def console_process(log_queue):
     """Dedicated process for all console output"""
@@ -52,6 +40,9 @@ def console_process(log_queue):
             elif msg['type'] == 'error':
                 console.print()
                 console.print(f"[red]❌ {msg['text']}[/red]")
+
+            elif msg['type'] == 'debug':
+                console.print(f"[dim]🐛 {msg['text']}[/dim]")
     except KeyboardInterrupt:
         print("LOG shutting down...")
     finally:

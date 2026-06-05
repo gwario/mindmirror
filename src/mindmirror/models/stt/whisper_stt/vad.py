@@ -1,6 +1,6 @@
 import numpy as np
 from collections import deque
-from .config import (
+from mindmirror.config import (
     SPEECH_THRESHOLD_MULTIPLIER,
     SILENCE_THRESHOLD_MULTIPLIER,
     MIN_NOISE_FLOOR,

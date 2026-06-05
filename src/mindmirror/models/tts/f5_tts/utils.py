@@ -1,6 +1,6 @@
 import os
 import re
-from .config import LOCK_FILE, MIN_CHUNK_LENGTH
+from mindmirror.config import LOCK_FILE, F5_MIN_CHUNK_LENGTH as MIN_CHUNK_LENGTH
 
 
 

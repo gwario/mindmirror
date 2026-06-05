@@ -1,6 +1,6 @@
-/.env
+.env
 /data
-/pipervoice/en/semaine
+/src/mindmirror/models/tts/pipervoice/en/semaine
 /test_excited.wav
 /test_lazy.wav
 /test_german.wav
