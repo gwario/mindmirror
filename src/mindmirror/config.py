@@ -1,5 +1,9 @@
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # --- PATHS ---
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -34,6 +38,7 @@ PRE_ROLL_DURATION = 0.5
 # --- SYSTEM TIMINGS ---
 LOOP_SLEEP_TIME = 0.1
 QUEUE_TIMEOUT = 0.5
+POST_PLAYBACK_COOLDOWN = 0.4
 
 # --- INTERRUPTION DETECTION ---
 INTERRUPT_ENERGY_MULTIPLIER = 2.5
@@ -46,7 +51,7 @@ INTERRUPT_KEYWORDS = [
 ]
 
 # --- TTS SETTINGS (PIPER) ---
-PIPER_MODEL_PATH = str(PROJECT_ROOT / "src/mindmirror/models/tts/pipervoice/en/semaine/en_GB-semaine-medium.onnx")
+PIPER_MODEL_PATH = str(PROJECT_ROOT / "src/mindmirror/tts/pipervoice/en/semaine/en_GB-semaine-medium.onnx")
 
 # --- TTS SETTINGS (F5) ---
 F5_VOICE_NAME = "MyVoice"
@@ -66,3 +71,30 @@ F5_STYLES = {
 
 # --- LLM SETTINGS (GEMINI) ---
 GEMINI_MODEL = 'gemini-flash-lite-latest'
+
+# --- STT SETTINGS (WHISPER) ---
+AWS_DEFAULT_REGION = os.getenv("AWS_DEFAULT_REGION", "eu-central-1")
+SAGEMAKER_WHISPER_ENDPOINT_NAME = os.getenv("SAGEMAKER_WHISPER_ENDPOINT_NAME", "whisper-large-v3-endpoint")
+
+# --- MCP SETTINGS ---
+USE_MOCK_MCP = os.getenv("USE_MOCK_MCP", "true").lower() == "true"
+
+if USE_MOCK_MCP:
+    import sys
+    MCP_SERVERS = [
+        {
+            "name": "fraud-detection",
+            "type": "stdio",
+            "command": sys.executable,
+            "args": [str(PROJECT_ROOT / "src/mindmirror/mcp/mock_server.py")]
+        }
+    ]
+else:
+    MCP_SERVERS = [
+        {
+            "name": "fraud-detection",
+            "type": "sse",
+            "url": os.getenv("MCP_FRAUD_SSE_URL", "http://localhost:8088/sse")
+        }
+    ]
+

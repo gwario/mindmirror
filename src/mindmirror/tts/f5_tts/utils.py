@@ -1,6 +1,6 @@
 import os
 import re
-from mindmirror.config import LOCK_FILE, F5_MIN_CHUNK_LENGTH as MIN_CHUNK_LENGTH
+from mindmirror.config import LOCK_FILE, PLAYBACK_LOCK, F5_MIN_CHUNK_LENGTH as MIN_CHUNK_LENGTH
 
 
 
@@ -54,5 +54,16 @@ def set_speaking_lock(active: bool):
         else:
             if os.path.exists(LOCK_FILE):
                 os.remove(LOCK_FILE)
+    except Exception:
+        pass
+
+def set_playback_lock(active: bool):
+    """Creates or removes the playback lock file to indicate active audio playback."""
+    try:
+        if active:
+            with open(PLAYBACK_LOCK, "w") as f: f.write("1")
+        else:
+            if os.path.exists(PLAYBACK_LOCK):
+                os.remove(PLAYBACK_LOCK)
     except Exception:
         pass

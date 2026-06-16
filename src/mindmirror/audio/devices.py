@@ -9,9 +9,9 @@ from mindmirror import config
 def select_audio_devices():
     """Select separate input and output devices"""
 
-    print("\n" + "🎤 " + "="*58)
-    print("SELECT INPUT DEVICE (Microphone)")
-    print("="*60)
+    print("\n" + "=" * 60)
+    print("🎙️  SELECT INPUT DEVICE (Microphone)")
+    print("=" * 60)
 
     while True:
         input_device, input_sr = select_audio_device(device_type='input')
@@ -25,9 +25,9 @@ def select_audio_devices():
             break
         print("\nLet's try selecting again...")
 
-    print("\n" + "🔊 " + "="*58)
-    print("SELECT OUTPUT DEVICE (Speaker)")
-    print("="*60)
+    print("\n" + "=" * 60)
+    print("🔊 SELECT OUTPUT DEVICE (Speaker)")
+    print("=" * 60)
 
     while True:
         output_device, output_sr = select_audio_device(device_type='output')
@@ -86,9 +86,10 @@ def select_audio_device(device_type='input'):
     """Select audio device with type filter (input or output)"""
 
     while True:
-        print("\n" + "="*60)
-        print(f"AVAILABLE AUDIO {device_type.upper()} DEVICES:")
-        print("="*60)
+        print("\n" + "=" * 60)
+        emoji = "🎙️ " if device_type == 'input' else "🔊 "
+        print(f"{emoji} AVAILABLE AUDIO {device_type.upper()} DEVICES:")
+        print("=" * 60)
 
         devices = sd.query_devices()
         valid_devices = []
@@ -111,7 +112,7 @@ def select_audio_device(device_type='input'):
                 print(f"      Channels: {channel_count}, "
                       f"Sample Rate: {device['default_samplerate']:.0f} Hz")
 
-        print("="*60)
+        print("=" * 60)
 
         if not valid_devices:
             print(f"⚠️  No {device_type} devices found!")
@@ -214,3 +215,26 @@ def get_valid_samplerate(device_id):
         if device_id is None:
             return int(sd.query_devices(kind='input')['default_samplerate'])
         return int(sd.query_devices(device_id)['default_samplerate'])
+
+def ask_headphones_mode():
+    """Ask if user is using headphones, with an explanation of what changes."""
+    print("\n" + "=" * 60)
+    print("🎧 HEADPHONES MODE SETTING")
+    print("=" * 60)
+    print("  Are you wearing/using headphones?")
+    print("  - If YES: The interruption (barge-in) feature will be fully active.")
+    print("  - If NO:  The interruption feature will be deactivated. Microphone")
+    print("            input will be muted/ignored during assistant playback to")
+    print("            prevent audio feedback loops and self-recording.")
+    print("="*60)
+    
+    while True:
+        choice = input("\nAre you using headphones? (y/n, Enter=no): ").strip().lower()
+        if choice in ['', 'n', 'no']:
+            print("✅ Headphones Mode: OFF (Interruption deactivated, mic muted during playback)")
+            return False
+        elif choice in ['y', 'yes']:
+            print("✅ Headphones Mode: ON (Interruption active)")
+            return True
+        else:
+            print("⚠️  Invalid input. Please enter 'y' or 'n'.")

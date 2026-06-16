@@ -1,15 +1,22 @@
 import os
 import sys
+from pathlib import Path
 
 import soundfile as sf
 import torch
 
+# Add src folder to sys.path to allow importing mindmirror config
+src_path = str(Path(__file__).resolve().parent.parent / "src")
+if src_path not in sys.path:
+    sys.path.append(src_path)
+
+from mindmirror import config
+
 # --- CONFIGURATION ---
-VOICE="MyVoice"
-F5_PATH = os.path.join(os.getcwd(), "..", "F5-TTS")
-CKPT_PATH = os.path.join(F5_PATH, f"ckpts/{VOICE}/model_last.pt")
-VOCAB_FILE = os.path.join(F5_PATH, f"data/{VOICE}_char/vocab.txt")
-WAVS_DIR = f"data/{VOICE}/wavs"
+F5_PATH = config.F5_LIB_PATH
+CKPT_PATH = config.F5_CKPT_PATH
+VOCAB_FILE = config.F5_VOCAB_FILE
+WAVS_DIR = config.F5_WAVS_DIR
 
 # Define your BEST recorded samples here
 STYLES = {
@@ -25,7 +32,7 @@ TEST_TEXT_EN = "I cannot believe we finally fixed the system. It is working."
 TEST_TEXT_DE = "Das System funktioniert jetzt endlich einwandfrei."
 
 # --- SETUP ---
-sys.path.append(os.path.join(F5_PATH, "src"))
+sys.path.append(str(F5_PATH / "src"))
 from f5_tts.infer.utils_infer import load_model, load_vocoder, infer_process
 from f5_tts.model import DiT
 

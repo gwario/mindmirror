@@ -3,8 +3,7 @@ import numpy as np
 import queue
 import time
 import os
-from .utils import set_speaking_lock
-from mindmirror.config import PLAYBACK_LOCK
+from .utils import set_speaking_lock, set_playback_lock
 
 def playback_thread(audio_queue, device_id, log_queue, control_queue, native_sr, stop_event):
     """
@@ -44,18 +43,12 @@ def playback_thread(audio_queue, device_id, log_queue, control_queue, native_sr,
                     current_vol = 1.0
                     
                     # Remove Playback Lock
-                    if os.path.exists(PLAYBACK_LOCK):
-                        try:
-                            os.remove(PLAYBACK_LOCK)
-                        except: pass
+                    set_playback_lock(False)
                     continue
 
                 # 3. Play Audio
                 # Create Playback Lock if not exists
-                if not os.path.exists(PLAYBACK_LOCK):
-                    try:
-                        with open(PLAYBACK_LOCK, 'w') as f: f.write("1")
-                    except: pass
+                set_playback_lock(True)
 
                 audio_data, sr = item
                 # Resample if needed (should be already resampled but safety first)
@@ -123,7 +116,4 @@ def playback_thread(audio_queue, device_id, log_queue, control_queue, native_sr,
         # Try to clean up lock if crash
         set_speaking_lock(False)
     finally:
-        if os.path.exists(PLAYBACK_LOCK):
-            try:
-                os.remove(PLAYBACK_LOCK)
-            except: pass
+        set_playback_lock(False)

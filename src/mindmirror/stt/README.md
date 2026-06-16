@@ -1,0 +1,55 @@
+# Speech-to-Text (STT) Module
+
+The Speech-to-Text module is responsible for capturing audio input, processing it through Voice Activity Detection (VAD) to isolate spoken speech, detecting interruptions during assistant output, and transcribing user speech into text.
+
+By default, the STT interface is implemented using **OpenAI's Whisper** model.
+
+## Interface Definition
+
+Any Speech-to-Text implementation must adhere to the contract defined in [interface.py](interface.py):
+
+*   **`load_model(self) -> None`**: Initialises the model weights locally or setups remote boto3 clients.
+*   **`transcribe(self, audio_data: np.ndarray, sample_rate: int) -> str`**: Decodes a single-channel raw float audio buffer and returns the transcribed text.
+
+The codebase implements this interface across two distinct classes:
+1.  **`LocalWhisperSTT`** in [local.py](whisper_stt/local.py): Uses the local `whisper` library. Handles CUDA-based GPU routing or multi-threaded CPU limits dynamically.
+2.  **`SageMakerWhisperSTT`** in [sagemaker.py](whisper_stt/sagemaker.py): Establishes a remote `boto3` SageMaker Runtime client and forwards binary audio requests to the specified model endpoint.
+
+---
+
+## Configuration and Parameterisation
+
+All STT settings are configured via class selections in [main.py](../main.py), environment variables in the `.env` file, and central constants in [config.py](../config.py).
+
+### 1. Engine Selection
+
+The STT class is configured inside [main.py](../main.py) directly:
+
+*   **Local Whisper STT** (`LocalWhisperSTT`):
+    *   Runs the model directly on your machine.
+    *   **CUDA (GPU)**: Highly recommended. If CUDA is detected, Whisper runs on GPU using half-precision (`fp16=True`) for optimal sub-second latency.
+    *   **CPU**: Whisper runs on CPU with limited threads (configured to 2 threads in code to prevent soundcard driver starving/audio stutter). Response times can be slow on low-powered machines.
+    *   Uses the Whisper **small** model configuration by default.
+*   **AWS SageMaker Remote Whisper STT** (`SageMakerWhisperSTT`):
+    *   Offloads inference tasks asynchronously to an external AWS SageMaker Endpoint hosting Whisper.
+    *   Recommended if you are running the assistant on a CPU-only hardware environment to achieve low response latency.
+
+### 2. Environment Variables (`.env`)
+
+Define these settings in the root `.env` file if using AWS SageMaker mode:
+
+```env
+# AWS Configuration (required if using SageMaker STT)
+AWS_DEFAULT_REGION=eu-central-1
+SAGEMAKER_WHISPER_ENDPOINT_NAME=your-sagemaker-whisper-endpoint-name
+
+# AWS Credentials (if not already configured via AWS CLI profile)
+AWS_ACCESS_KEY_ID=your_aws_access_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+```
+
+### 3. VAD and DSP Settings
+Centralised constants in [config.py](../config.py) adjust the sound capture thresholds:
+*   `SPEECH_THRESHOLD_MULTIPLIER` (`4.0`): Dynamic threshold multiplier determining when user input speech starts.
+*   `SILENCE_DURATION` (`2.0`): Duration of silence in seconds to mark the end of user input and trigger transcription.
+*   `MIN_AUDIO_LENGTH` (`0.8`): Minimum duration of speech required in seconds before triggering transcription (filters out short mouth noises or clicks).

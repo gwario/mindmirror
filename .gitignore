@@ -1,6 +1,6 @@
 .env
 /data
-/src/mindmirror/models/tts/pipervoice/en/semaine
+/src/mindmirror/tts/pipervoice/en/semaine
 /test_excited.wav
 /test_lazy.wav
 /test_german.wav
@@ -11,3 +11,4 @@ __pycache__/
 *.py[cod]
 /audio_buffer
 speaking.lock
+*.code-workspace
