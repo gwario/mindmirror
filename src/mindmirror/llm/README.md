@@ -28,11 +28,13 @@ The parser matches these tags and segments the output into tuples of `(style, te
 ## Configuration and Parameterisation
 
 ### 1. Environment Variables (`.env`)
-To use Google Gemini, you must set the API key in the root `.env` file:
+To use Google Gemini, you must configure Google Cloud authentication and project parameters:
 
 ```env
-# Required: Google AI Studio API key
-GEMINI_API_KEY=your_gemini_api_key_here
+# Required: Google Application Credentials path and project parameters
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/service-account-key.json
+GOOGLE_CLOUD_PROJECT=your-google-cloud-project-id
+GOOGLE_CLOUD_LOCATION=us-central1
 
 # Optional: Hugging Face API key
 HF_TOKEN=your_hugging_face_token_here
@@ -40,7 +42,7 @@ HF_TOKEN=your_hugging_face_token_here
 
 ### 2. LLM Settings
 You can customize the model used in [config.py](../config.py):
-*   `GEMINI_MODEL` (`gemini-flash-lite-latest`): The model version used for text generation. For latency-sensitive voice loops, lightweight models (like Flash-Lite) are recommended.
+*   `GOOGLE_TTT_MODEL` (`gemini-flash-lite-latest`): The model version used for text generation. For latency-sensitive voice loops, lightweight models (like Flash-Lite) are recommended.
 
 ### 3. Model-Context Protocol (MCP) Integration
 The assistant can be extended with tools provided by MCP servers. You can define servers in [config.py](../config.py):

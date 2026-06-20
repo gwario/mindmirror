@@ -2,17 +2,19 @@ import os
 import signal
 import sys
 import time
+import argparse
 from multiprocessing import Process, Queue, active_children
 
 from mindmirror import audio, config
 from mindmirror.ui.console import console_process
 
 # Concrete model implementations
-from mindmirror.stt.whisper_stt.local import LocalWhisperSTT
-from mindmirror.stt.whisper_stt.sagemaker import SageMakerWhisperSTT
-from mindmirror.llm.gemini.client import GeminiLLMClient
+from mindmirror.stt.local_whisper import LocalWhisperSTT
+from mindmirror.stt.aws_whisper import SageMakerWhisperSTT
+from mindmirror.llm.google.client import GeminiLLMClient
 from mindmirror.tts.pipervoice.tts import PiperTTS
 from mindmirror.tts.f5_tts.tts import F5TTS
+from mindmirror.tts.google import GoogleCloudTTS
 
 # Generic runners
 from mindmirror.stt.runner import run_stt_loop
@@ -20,8 +22,6 @@ from mindmirror.llm.runner import run_ttt_loop
 from mindmirror.tts.runner import run_tts_loop
 
 SYSTEM_PROMPT = """
-You are an individual named Mario.
-
 You are a smart, helpful assistant with a chill and upbeat vibe. Keep
 responses short and snappy — no waffle, no fluff. Be warm and supportive
 without being over the top or sycophantic. Assume the user is technically
@@ -67,6 +67,10 @@ def signal_handler(sig, frame):
     sys.exit(0)
 
 def main():
+    parser = argparse.ArgumentParser(description="MindMirror Local Voice Assistant")
+    parser.add_argument("--default", action="store_true", help="Start with default audio devices and headphones mode ON without prompting")
+    args = parser.parse_args()
+
     signal.signal(signal.SIGINT, signal_handler)
     clean_stale_locks()
 
@@ -86,36 +90,66 @@ def main():
     print()
 
     # 2. AUDIO HARDWARE SELECTION
-    input_device, input_sr, output_device, output_sr = audio.select_audio_devices()
-    headphones_mode = audio.ask_headphones_mode()
+    if args.default:
+        import sounddevice as sd
+        try:
+            default_input_id = sd.default.device[0] if isinstance(sd.default.device, (list, tuple)) else sd.default.device
+            default_output_id = sd.default.device[1] if isinstance(sd.default.device, (list, tuple)) else sd.default.device
+            
+            input_device = default_input_id
+            input_sr = int(sd.query_devices(default_input_id)['default_samplerate'])
+            
+            output_device = default_output_id
+            output_sr = int(sd.query_devices(default_output_id)['default_samplerate'])
+            
+            headphones_mode = True
+            
+            print(f"✅ Using Default Input: {sd.query_devices(default_input_id)['name']} @ {input_sr}Hz")
+            print(f"✅ Using Default Output: {sd.query_devices(default_output_id)['name']} @ {output_sr}Hz")
+            print(f"✅ Headphones Mode: ON")
+        except Exception as e:
+            print(f"⚠️ Failed to load default devices via sounddevice: {e}. Falling back to manual selection.")
+            input_device, input_sr, output_device, output_sr = audio.select_audio_devices()
+            headphones_mode = audio.ask_headphones_mode()
+    else:
+        input_device, input_sr, output_device, output_sr = audio.select_audio_devices()
+        headphones_mode = audio.ask_headphones_mode()
 
     # 3. PIPELINE COMPOSITION (Edit classes and arguments to change your setup)
     print("\n🚀 Initializing pipeline composition...")
 
     # --- Speech-To-Text (STT) Selection ---
     # Choice A: Local Whisper STT (best with CUDA/GPU)
-    # stt_class = LocalWhisperSTT
-    # stt_kwargs = {"model_name": "small"}
+    stt_class = LocalWhisperSTT
+    stt_kwargs = {"model_name": "small"}
 
     # Choice B: AWS SageMaker Remote Whisper STT (best for CPU environments)
-    stt_class = SageMakerWhisperSTT
-    stt_kwargs = {
-        "region": getattr(config, 'AWS_DEFAULT_REGION', 'eu-central-1'),
-        "endpoint_name": getattr(config, 'SAGEMAKER_WHISPER_ENDPOINT_NAME', 'whisper-large-v3-endpoint')
-    }
+    # stt_class = SageMakerWhisperSTT
+    # stt_kwargs = {
+    #     "region": getattr(config, 'AWS_DEFAULT_REGION', None),
+    #     "endpoint_name": getattr(config, 'AWS_SAGEMAKER_WHISPER_ENDPOINT_NAME', None)
+    # }
 
     # --- Text-To-Thought (TTT / LLM) Selection ---
     ttt_class = GeminiLLMClient
-    ttt_kwargs = {"model_name": config.GEMINI_MODEL}
+    ttt_kwargs = {"model_name": config.GOOGLE_TTT_MODEL}
 
     # --- Text-To-Speech (TTS) Selection ---
     # Choice A: Piper TTS (Fast ONNX CPU synthesis)
-    tts_class = PiperTTS
-    tts_kwargs = {}
+    # tts_class = PiperTTS
+    # tts_kwargs = {}
 
     # Choice B: F5-TTS Voice Cloning (Diffusion synthesis, requires local GPU/CUDA)
     # tts_class = F5TTS
     # tts_kwargs = {}
+
+    # Choice C: Google Cloud Remote TTS (High quality, requires internet connection and credentials)
+    tts_class = GoogleCloudTTS
+    tts_kwargs = {
+        "voice_name": config.GOOGLE_TTS_VOICE,
+        "language_code": config.GOOGLE_TTS_LANG,
+        "model_name": config.GOOGLE_TTS_MODEL
+    }
 
     # 4. INITIALIZE QUEUES
     stt_queue = Queue()       # STT -> TTT

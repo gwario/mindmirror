@@ -40,19 +40,42 @@ mindmirror/
 2. Set up your API Keys and Settings:
    - Create a `.env` file in the root directory.
    - Configure the following settings:
-     ```env
-     # AWS configuration (if using AWS SageMaker mode for STT)
-     AWS_DEFAULT_REGION=eu-central-1          # AWS Region for SageMaker
-     SAGEMAKER_WHISPER_ENDPOINT_NAME=your-endpoint-name-here
+      ```env
+      # ==============================================================================
+      # Google Cloud Platform (Vertex AI & Text-to-Speech)
+      # ==============================================================================
+      GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/service-account-key.json
+      GOOGLE_CLOUD_PROJECT=886498416680         # Your Google Cloud Project ID
+      GOOGLE_CLOUD_LOCATION=us-central1         # Your Google Cloud Location
 
-     # Credentials for AWS (if using sagemaker mode)
-     AWS_ACCESS_KEY_ID=your_aws_access_key
-     AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+      # Model Selection
+      GOOGLE_TTT_MODEL=gemini-2.5-flash            # Default Gemini model
+      GOOGLE_TTS_MODEL=gemini-3.1-flash-tts-preview # Default TTS model
+      GOOGLE_TTS_VOICE=Aoede                     # Default TTS voice
+      GOOGLE_TTS_LANG=en-gb                      # Default TTS language
 
-     # LLM and Hugging Face Keys
-     GEMINI_API_KEY=your_gemini_api_key_here  # Required (Google Gemini Access Key from Google AI Studio)
-     HF_TOKEN=your_hugging_face_token_here    # Optional (Hugging Face Access Token for downloading gated models)
-     ```
+
+      # ==============================================================================
+      # Amazon Web Services (SageMaker Speech-to-Text & LLM)
+      # ==============================================================================
+      # AWS Credentials (if not configured via AWS CLI profile)
+      AWS_ACCESS_KEY_ID=your_aws_access_key
+      AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+      AWS_DEFAULT_REGION=eu-central-1          # AWS Region for SageMaker
+
+      # SageMaker Endpoints
+      AWS_SAGEMAKER_WHISPER_ENDPOINT_NAME=whisper-large-v3-endpoint
+      AWS_SAGEMAKER_LLM_ENDPOINT_NAME=llama-3-8b-instruct-endpoint  # Required if using SageMaker LLM mode
+
+
+      # ==============================================================================
+      # Hugging Face
+      # ==============================================================================
+      HF_TOKEN=your_hugging_face_token_here    # Optional (Hugging Face Access Token)
+      ```
+   - **Google Cloud Authentication**:
+     - *Option A*: Create a GCP Service Account key file, download the JSON file, and set the `GOOGLE_APPLICATION_CREDENTIALS` path above.
+     - *Option B*: Install Google Cloud CLI (`gcloud`) and run `gcloud auth application-default login` on your system.
    - *Recommendation on STT & TTS selection in [main.py](src/mindmirror/main.py)*:
      - Open [main.py](src/mindmirror/main.py) to edit classes and options directly:
      - **STT Selection**: If you have a local GPU (**CUDA available**), we recommend using `LocalWhisperSTT` to run locally for free with sub-second latency. If running on **CPU only (no CUDA)**, uncomment `SageMakerWhisperSTT` to offload inference to AWS for faster response times.
@@ -67,6 +90,13 @@ mindmirror/
    ```bash
    PYTHONPATH=src python3 src/mindmirror/main.py
    ```
+
+### Checking Available Google Cloud Models:
+You can verify which conversational (TTT) and Text-to-Speech (TTS) models are accessible under your Google Cloud project using the checking script:
+```bash
+PYTHONPATH=src python3 scripts/check_google_models.py
+```
+This script queries the Vertex AI model catalog, filters for chat/conversational and TTS models, performs live connectivity checks, and prints a list of models that are actively available to use in your configuration.
 
 ### For Custom Voice (F5-TTS Fine-tuning):
 1. Clone and install F5-TTS repository: clone and then `(mindmirror) repos/mindmirror$ ` `pip install -e .`

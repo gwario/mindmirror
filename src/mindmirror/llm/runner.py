@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from google.api_core import exceptions
 
 from mindmirror import config
-from mindmirror.llm.gemini.mcp_client import MCPClientManager
+from mindmirror.llm.google.mcp_client import MCPClientManager
 
 def strip_markdown(text):
     """Remove markdown formatting but preserve all text content including code"""
@@ -67,7 +67,26 @@ async def async_run_ttt_loop(ttt_class, ttt_kwargs, system_prompt, log_queue, te
         llm_client = ttt_class(**kwargs)
         await llm_client.init_chat()
 
-        last_request_time = 0
+        # Handle optional greeting on start
+        greet_on_start = getattr(config, 'GREET_ON_START', False)
+        if greet_on_start:
+            log_queue.put({'type': 'status', 'text': '🤖 Generating initial greeting...'})
+            try:
+                greeting_trigger = getattr(config, 'GREETING_TRIGGER_TEXT', 'Greet the user shortly.')
+                response_text = await llm_client.send_message(greeting_trigger)
+                log_queue.put({'type': 'ai', 'text': response_text})
+
+                # Parse response into segments based on style tags
+                segments = parse_llm_response(response_text)
+
+                # Send to response queue for TTS synthesis
+                for style, segment_text in segments:
+                    clean_text = strip_markdown(segment_text)
+                    response_queue.put((style, clean_text))
+            except Exception as e:
+                log_queue.put({'type': 'status', 'text': f"❌ Error generating startup greeting: {e}"})
+
+        last_request_time = time.time() if greet_on_start else 0
         min_interval = 5.0  # 5 seconds between requests
 
         while True:

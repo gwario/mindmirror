@@ -1,0 +1,1 @@
+from mindmirror.stt.aws_whisper.sagemaker import SageMakerWhisperSTT

@@ -12,3 +12,4 @@ piper-tts
 rich
 pyyaml
 python-dotenv
+google-cloud-texttospeech>=2.16.0

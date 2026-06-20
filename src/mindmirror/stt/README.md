@@ -12,8 +12,8 @@ Any Speech-to-Text implementation must adhere to the contract defined in [interf
 *   **`transcribe(self, audio_data: np.ndarray, sample_rate: int) -> str`**: Decodes a single-channel raw float audio buffer and returns the transcribed text.
 
 The codebase implements this interface across two distinct classes:
-1.  **`LocalWhisperSTT`** in [local.py](whisper_stt/local.py): Uses the local `whisper` library. Handles CUDA-based GPU routing or multi-threaded CPU limits dynamically.
-2.  **`SageMakerWhisperSTT`** in [sagemaker.py](whisper_stt/sagemaker.py): Establishes a remote `boto3` SageMaker Runtime client and forwards binary audio requests to the specified model endpoint.
+1.  **`LocalWhisperSTT`** in [local.py](local_whisper/local.py): Uses the local `whisper` library. Handles CUDA-based GPU routing or multi-threaded CPU limits dynamically.
+2.  **`SageMakerWhisperSTT`** in [sagemaker.py](aws_whisper/sagemaker.py): Establishes a remote `boto3` SageMaker Runtime client and forwards binary audio requests to the specified model endpoint.
 
 ---
 
@@ -41,7 +41,7 @@ Define these settings in the root `.env` file if using AWS SageMaker mode:
 ```env
 # AWS Configuration (required if using SageMaker STT)
 AWS_DEFAULT_REGION=eu-central-1
-SAGEMAKER_WHISPER_ENDPOINT_NAME=your-sagemaker-whisper-endpoint-name
+AWS_SAGEMAKER_WHISPER_ENDPOINT_NAME=whisper-large-v3-endpoint
 
 # AWS Credentials (if not already configured via AWS CLI profile)
 AWS_ACCESS_KEY_ID=your_aws_access_key

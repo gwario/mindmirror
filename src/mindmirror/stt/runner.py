@@ -11,7 +11,7 @@ from mindmirror.config import (
 )
 from mindmirror import audio
 from mindmirror.ui import meters
-from mindmirror.stt.whisper_stt.vad import VADEngine
+from mindmirror.stt.vad import VADEngine
 
 def run_stt_loop(stt_class, stt_kwargs, log_queue, selected_device, text_queue, control_queue, headphones_mode=False):
     # 1. SETUP ENGINE

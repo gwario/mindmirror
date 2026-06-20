@@ -28,7 +28,29 @@ class GeminiLLMClient(TTTInterface):
         self.tools = tools
         self.execute_tool = execute_tool_callback
         self.log_queue = log_queue
-        self.client = genai.Client()
+        
+        import os
+        import json
+        from mindmirror import config
+
+        key_path = getattr(config, 'GOOGLE_APPLICATION_CREDENTIALS', None)
+        project_id = None
+        if key_path and os.path.exists(key_path):
+            try:
+                with open(key_path, "r") as f:
+                    key_data = json.load(f)
+                    project_id = key_data.get("project_id")
+            except Exception:
+                pass
+
+        project = project_id or getattr(config, 'GOOGLE_CLOUD_PROJECT', None)
+        location = getattr(config, 'GOOGLE_CLOUD_LOCATION', None)
+
+        self.client = genai.Client(
+            vertexai=True,
+            project=project,
+            location=location
+        )
         self.chat = None
 
     async def init_chat(self):
@@ -46,7 +68,9 @@ class GeminiLLMClient(TTTInterface):
             function_declarations.append(decl)
             
         tool_config = None
-        if function_declarations:
+        # gemini-2.0-flash-lite-preview-02-05 / gemini-2.0-flash-lite / flash-lite models do not support function calling
+        is_lite_model = "lite" in self.model_name.lower()
+        if function_declarations and not is_lite_model:
             tool_config = [types.Tool(function_declarations=function_declarations)]
             
         self.chat = self.client.aio.chats.create(

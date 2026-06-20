@@ -53,6 +53,33 @@ INTERRUPT_KEYWORDS = [
 # --- TTS SETTINGS (PIPER) ---
 PIPER_MODEL_PATH = str(PROJECT_ROOT / "src/mindmirror/tts/pipervoice/en/semaine/en_GB-semaine-medium.onnx")
 
+# --- TTS SETTINGS (GOOGLE CLOUD) ---
+GOOGLE_TTS_MODEL = os.getenv("GOOGLE_TTS_MODEL")
+GOOGLE_TTS_VOICE = os.getenv("GOOGLE_TTS_VOICE")
+GOOGLE_TTS_LANG = os.getenv("GOOGLE_TTS_LANG")
+GOOGLE_TTS_STYLES = {
+    "neutral": {
+        "speaking_rate": 1.15, 
+        "pitch": 0.0,
+        "prompt": "Read aloud in a warm, welcoming tone."
+    },
+    "excited": {
+        "speaking_rate": 1.1, 
+        "pitch": 0.5,
+        "prompt": "Read aloud in an excited, high-energy, and enthusiastic tone."
+    },
+    "serious": {
+        "speaking_rate": 1.05, 
+        "pitch": -0.5,
+        "prompt": "Read aloud in a professional, slightly casual tone."
+    },
+    "lazy": {
+        "speaking_rate": 1.0, 
+        "pitch": -1.5,
+        "prompt": "Read aloud in a casual and relaxed tone."
+    },
+}
+
 # --- TTS SETTINGS (F5) ---
 F5_VOICE_NAME = "MyVoice"
 # Assuming F5-TTS is cloned alongside the main project root
@@ -69,12 +96,22 @@ F5_STYLES = {
     "lazy": {"ref_audio": str(F5_WAVS_DIR / "en_D_01.wav"), "ref_text": "Yeah, I think that's... mostly correct, actually.", "cfg": 2.5, "speed": 1.0}
 }
 
+# --- PIPELINE GREETING SETTINGS ---
+GREET_ON_START = os.getenv("GREET_ON_START", "true").lower() == "true"
+GREETING_TRIGGER_TEXT = os.getenv("GREETING_TRIGGER_TEXT", "Greet the user shortly to start the conversation.")
+
+# --- GOOGLE APPLICATION CREDENTIALS ---
+GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+
 # --- LLM SETTINGS (GEMINI) ---
-GEMINI_MODEL = 'gemini-flash-lite-latest'
+GOOGLE_TTT_MODEL = os.getenv("GOOGLE_TTT_MODEL")
+GOOGLE_TTT_USE_VERTEXAI = os.getenv("GOOGLE_TTT_USE_VERTEXAI", "false").lower() == "true"
+GOOGLE_CLOUD_PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT")
+GOOGLE_CLOUD_LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION")
 
 # --- STT SETTINGS (WHISPER) ---
-AWS_DEFAULT_REGION = os.getenv("AWS_DEFAULT_REGION", "eu-central-1")
-SAGEMAKER_WHISPER_ENDPOINT_NAME = os.getenv("SAGEMAKER_WHISPER_ENDPOINT_NAME", "whisper-large-v3-endpoint")
+AWS_DEFAULT_REGION = os.getenv("AWS_DEFAULT_REGION")
+AWS_SAGEMAKER_WHISPER_ENDPOINT_NAME = os.getenv("AWS_SAGEMAKER_WHISPER_ENDPOINT_NAME")
 
 # --- MCP SETTINGS ---
 USE_MOCK_MCP = os.getenv("USE_MOCK_MCP", "true").lower() == "true"

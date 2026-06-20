@@ -14,8 +14,8 @@ class SageMakerWhisperSTT(STTInterface):
     """
 
     def __init__(self, region: str = None, endpoint_name: str = None, log_queue = None):
-        self.region = region or getattr(config, 'AWS_DEFAULT_REGION', 'eu-central-1')
-        self.endpoint_name = endpoint_name or getattr(config, 'SAGEMAKER_WHISPER_ENDPOINT_NAME', 'whisper-large-v3-endpoint')
+        self.region = region or getattr(config, 'AWS_DEFAULT_REGION', None)
+        self.endpoint_name = endpoint_name or getattr(config, 'AWS_SAGEMAKER_WHISPER_ENDPOINT_NAME', None)
         self.log_queue = log_queue
         self.client = None
 
