@@ -10,28 +10,9 @@ import sys
 
 from mindmirror import config
 from mindmirror.tts.interface import TTSInterface
+from mindmirror.tts.utils import set_speaking_lock, set_playback_lock
 
-def set_speaking_lock(active: bool):
-    """Creates or removes the lock file to mute the mic."""
-    try:
-        if active:
-            with open(config.LOCK_FILE, "w") as f: f.write("active")
-        else:
-            if os.path.exists(config.LOCK_FILE):
-                os.remove(config.LOCK_FILE)
-    except Exception:
-        pass
 
-def set_playback_lock(active: bool):
-    """Creates or removes the playback lock file to indicate active audio playback."""
-    try:
-        if active:
-            with open(config.PLAYBACK_LOCK, "w") as f: f.write("1")
-        else:
-            if os.path.exists(config.PLAYBACK_LOCK):
-                os.remove(config.PLAYBACK_LOCK)
-    except Exception:
-        pass
 
 class PiperTTS(TTSInterface):
     """
@@ -63,16 +44,16 @@ class PiperTTS(TTSInterface):
                 
             if item is None: break
             
+            style = "neutral"
             if isinstance(item, tuple):
-                _, text = item
+                style, text = item
             else:
                 text = item
 
             if text.strip():
                 set_speaking_lock(True)
-                log_queue.put({'type': 'status', 'text': f"🔊 Speaking:"})
+                log_queue.put({'type': 'status', 'text': f"🔊 Speaking ({style}):"})
                 log_queue.put({'type': 'status', 'text': text})
-                print(f"DEBUG: Piper TTS received text: {text[:20]}...")
 
                 # Create Playback Lock (Audio Output)
                 set_playback_lock(True)
@@ -137,8 +118,10 @@ class PiperTTS(TTSInterface):
                         if interrupted:
                             # Clear text queue
                             while not text_queue.empty():
-                                try: text_queue.get_nowait()
-                                except: pass
+                                try:
+                                    text_queue.get_nowait()
+                                except queue.Empty:
+                                    pass
                 
                 except Exception as e:
                     log_queue.put({'type': 'error', 'text': f"Piper TTS Error: {e}"})

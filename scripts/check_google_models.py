@@ -3,6 +3,12 @@ from google import genai
 import os
 import json
 import sys
+
+# Ensure src path is in sys.path
+src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
+
 from mindmirror import config
 
 load_dotenv()
@@ -32,6 +38,34 @@ client = genai.Client(
     project=project,
     location=location
 )
+
+# Check Speech-to-Text (STT) V2 Configuration
+print("=========================================================")
+print("Speech-to-Text (STT) V2 Configuration Check")
+print("=========================================================")
+stt_model = getattr(config, 'GOOGLE_STT_MODEL', None)
+stt_lang = getattr(config, 'GOOGLE_STT_LANG', None)
+
+if stt_model and stt_lang:
+    print(f"Configured STT Model: {stt_model}")
+    print(f"Configured STT Language: {stt_lang}")
+    print("🔄 Testing Speech V2 Recognizer setup... ", end="", flush=True)
+    try:
+        from mindmirror.stt.google import GoogleCloudSTT
+        stt = GoogleCloudSTT(
+            language_code=stt_lang,
+            model=stt_model,
+            location=location,
+            project_id=project,
+            log_queue=None
+        )
+        stt.load_model()
+        print("✅ [SUCCESSFUL] Recognizer config is valid and ready.")
+    except Exception as e:
+        print(f"❌ [FAILED: {e}]")
+else:
+    print("  (STT Configuration not found in config/env)")
+print("=========================================================\n")
 
 try:
     models = list(client.models.list())

@@ -29,3 +29,27 @@ class STTInterface(ABC):
             str: Transcribed text segment. None if transcription fails or is empty.
         """
         pass
+
+    def is_streaming(self) -> bool:
+        """
+        Returns True if the engine supports real-time chunk-by-chunk streaming transcription.
+        """
+        return False
+
+    def start_stream(self, sample_rate: int) -> None:
+        """
+        Initializes a real-time streaming recognition session.
+        """
+        pass
+
+    def send_chunk(self, chunk: np.ndarray) -> None:
+        """
+        Sends an audio chunk to the active streaming recognition session.
+        """
+        pass
+
+    def end_stream(self) -> str:
+        """
+        Finalises the active streaming recognition session and returns the transcribed text.
+        """
+        return ""

@@ -11,6 +11,7 @@ from mindmirror.ui.console import console_process
 # Concrete model implementations
 from mindmirror.stt.local_whisper import LocalWhisperSTT
 from mindmirror.stt.aws_whisper import SageMakerWhisperSTT
+from mindmirror.stt.google import GoogleCloudSTT
 from mindmirror.llm.google.client import GeminiLLMClient
 from mindmirror.tts.pipervoice.tts import PiperTTS
 from mindmirror.tts.f5_tts.tts import F5TTS
@@ -120,8 +121,8 @@ def main():
 
     # --- Speech-To-Text (STT) Selection ---
     # Choice A: Local Whisper STT (best with CUDA/GPU)
-    stt_class = LocalWhisperSTT
-    stt_kwargs = {"model_name": "small"}
+    # stt_class = LocalWhisperSTT
+    # stt_kwargs = {"model_name": "small"}
 
     # Choice B: AWS SageMaker Remote Whisper STT (best for CPU environments)
     # stt_class = SageMakerWhisperSTT
@@ -129,6 +130,13 @@ def main():
     #     "region": getattr(config, 'AWS_DEFAULT_REGION', None),
     #     "endpoint_name": getattr(config, 'AWS_SAGEMAKER_WHISPER_ENDPOINT_NAME', None)
     # }
+
+    # Choice C: Google Cloud Remote STT v2 (High quality, streaming recognition)
+    stt_class = GoogleCloudSTT
+    stt_kwargs = {
+        "language_code": config.GOOGLE_STT_LANG,
+        "model": config.GOOGLE_STT_MODEL
+    }
 
     # --- Text-To-Thought (TTT / LLM) Selection ---
     ttt_class = GeminiLLMClient

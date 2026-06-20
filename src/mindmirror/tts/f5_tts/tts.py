@@ -91,8 +91,10 @@ class F5TTS(TTSInterface):
 
                     log_queue.put({'type': 'debug', 'text': f"Gen: {time.time() - start_t:.2f}s"})
 
-                audio_queue.put("DONE") # Signal end of paragraph
-
             except Exception as e:
                 log_queue.put({'type': 'error', 'text': f"Gen Error: {e}"})
-                set_speaking_lock(False)
+
+            finally:
+                # Always signal end-of-paragraph so the player releases its locks,
+                # even if generation was interrupted by an exception or stop event.
+                audio_queue.put("DONE")

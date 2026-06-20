@@ -7,28 +7,9 @@ from google.cloud import texttospeech
 
 from mindmirror import audio, config
 from mindmirror.tts.interface import TTSInterface
+from mindmirror.tts.utils import set_speaking_lock, set_playback_lock
 
-def set_speaking_lock(active: bool):
-    """Creates or removes the lock file to mute the mic."""
-    try:
-        if active:
-            with open(config.LOCK_FILE, "w") as f: f.write("active")
-        else:
-            if os.path.exists(config.LOCK_FILE):
-                os.remove(config.LOCK_FILE)
-    except Exception:
-        pass
 
-def set_playback_lock(active: bool):
-    """Creates or removes the playback lock file to indicate active audio playback."""
-    try:
-        if active:
-            with open(config.PLAYBACK_LOCK, "w") as f: f.write("1")
-        else:
-            if os.path.exists(config.PLAYBACK_LOCK):
-                os.remove(config.PLAYBACK_LOCK)
-    except Exception:
-        pass
 
 class GoogleCloudTTS(TTSInterface):
     """
@@ -76,7 +57,6 @@ class GoogleCloudTTS(TTSInterface):
             set_speaking_lock(True)
             log_queue.put({'type': 'status', 'text': f"🔊 Speaking ({style}):"})
             log_queue.put({'type': 'status', 'text': text})
-            print(f"DEBUG: Google Cloud TTS received text: {text[:20]}...")
 
             set_playback_lock(True)
 

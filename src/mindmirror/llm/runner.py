@@ -124,7 +124,7 @@ async def async_run_ttt_loop(ttt_class, ttt_kwargs, system_prompt, log_queue, te
 
                 except exceptions.ResourceExhausted as e:
                     retry_count += 1
-                    wait_time = 60 * retry_count  # Exponential backoff
+                    wait_time = 60 * (2 ** (retry_count - 1))  # Exponential backoff: 60s, 120s, 240s
                     log_queue.put({'type': 'status', 'text': f"❌ Rate limit hit! Retry {retry_count}/{max_retries}"})
                     log_queue.put({'type': 'status', 'text': f"⏱️  Waiting {wait_time}s before retrying..."})
                     await asyncio.sleep(wait_time)

@@ -67,10 +67,68 @@ F5_STYLES = {
 
 ---
 
-## Custom Voice Training Guidelines
+## Custom Voice Training (F5-TTS Fine-Tuning)
 
-To train F5-TTS on your own voice:
-1.  **Record audio samples**: Run the script `scripts/record_sample.py` to record sample clips to train on.
-2.  **Dataset Preparation**: Extract/transcribe clips into pinyin tokens using `prepare_csv_wavs.py` within the F5-TTS repository.
-3.  **Fine-Tuning**: Execute `finetune_cli.py` pointing to the pretrained F5-TTS checkpoint (e.g., `model_1250000.safetensors`).
-4.  **Testing**: Verify model checkpoints by calling `scripts/test_inference.py` before uncommenting `F5TTS` in [main.py](../main.py).
+To train F5-TTS on your own voice, follow these steps. All commands assume two sibling repos: `repos/mindmirror/` and `repos/F5-TTS/`.
+
+1.  **Install F5-TTS**: Clone the F5-TTS repository, then install it in editable mode:
+    ```bash
+    # (mindmirror) repos/mindmirror$
+    pip install -e ../F5-TTS
+    ```
+2.  **Record voice samples**:
+    ```bash
+    # (mindmirror) repos/mindmirror$
+    PYTHONPATH=src python3 scripts/record_sample.py
+    ```
+3.  **Download the pretrained model**: Download `F5TTS_v1_Base` from Hugging Face.
+4.  **Adjust the pretrained vocab path** in `repos/F5-TTS/src/f5_tts/train/datasets/prepare_csv_wavs.py`:
+    ```python
+    PRETRAINED_VOCAB_PATH = files("f5_tts").joinpath("../../data/Emilia_ZH_EN_pinyin/vocab.txt")
+    ```
+5.  **Prepare the dataset**:
+    ```bash
+    # (mindmirror) repos/F5-TTS$
+    python src/f5_tts/train/datasets/prepare_csv_wavs.py ../mindmirror/data/MyVoice/ ./data/MyVoice_pinyin
+    ```
+6.  **Adjust worker count** in `repos/F5-TTS/src/f5_tts/train/finetune_cli.py`:
+    ```python
+    num_workers = os.cpu_count()
+    ```
+7.  **Fine-tune the model**:
+    ```bash
+    # (mindmirror) repos/F5-TTS$
+    python src/f5_tts/train/finetune_cli.py \
+      --exp_name F5TTS_v1_Base \
+      --dataset_name MyVoice \
+      --finetune \
+      --pretrain ckpts/F5TTS_v1_Base/model_1250000.safetensors \
+      --tokenizer pinyin \
+      --learning_rate 5e-5 \
+      --epochs 50 \
+      --batch_size_type sample \
+      --batch_size_per_gpu 1 \
+      --grad_accumulation_steps 4 \
+      --save_per_updates 5000 \
+      --keep_last_n_checkpoints 1
+    ```
+8.  **Test the checkpoint**:
+    ```bash
+    # (mindmirror) repos/mindmirror$
+    python scripts/test_inference.py
+    ```
+9.  **Test inference directly** (optional sanity check):
+    ```bash
+    # (mindmirror) repos/F5-TTS$
+    python src/f5_tts/infer/infer_cli.py \
+      --model F5TTS_v1_Base \
+      --ckpt_file ckpts/MyVoice/model_last.pt \
+      --ref_audio ../mindmirror/voice_samples/wavs_clean/paragraph_01.wav \
+      --ref_text "The birch canoe slid on the smooth planks." \
+      --gen_text "This is a test. I am checking if my voice model is overtrained."
+    ```
+10. **Run the main pipeline** with your new voice:
+    ```bash
+    # (mindmirror) repos/mindmirror$
+    PYTHONPATH=src python3 src/mindmirror/main.py
+    ```

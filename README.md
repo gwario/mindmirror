@@ -49,10 +49,10 @@ mindmirror/
       GOOGLE_CLOUD_LOCATION=us-central1         # Your Google Cloud Location
 
       # Model Selection
-      GOOGLE_TTT_MODEL=gemini-2.5-flash            # Default Gemini model
-      GOOGLE_TTS_MODEL=gemini-3.1-flash-tts-preview # Default TTS model
+      GOOGLE_TTT_MODEL=gemini-2.5-flash-lite         # Default Gemini model
+      GOOGLE_TTS_MODEL=gemini-2.5-flash-preview-tts  # Default TTS model
       GOOGLE_TTS_VOICE=Aoede                     # Default TTS voice
-      GOOGLE_TTS_LANG=en-gb                      # Default TTS language
+      GOOGLE_TTS_LANG=en-gb                      # Default TTS language (align with GOOGLE_STT_LANG)
 
 
       # ==============================================================================
@@ -99,18 +99,7 @@ PYTHONPATH=src python3 scripts/check_google_models.py
 This script queries the Vertex AI model catalog, filters for chat/conversational and TTS models, performs live connectivity checks, and prints a list of models that are actively available to use in your configuration.
 
 ### For Custom Voice (F5-TTS Fine-tuning):
-1. Clone and install F5-TTS repository: clone and then `(mindmirror) repos/mindmirror$ ` `pip install -e .`
-2. Record voice sample: `(mindmirror) repos/mindmirror$ ` `PYTHONPATH=src python3 scripts/record_sample.py`
-3. Download the pretrained model "F5TTS_v1_Base" from huggingface
-4. Adjust to the pretrained vocab `PRETRAINED_VOCAB_PATH = files("f5_tts").joinpath("../../data/Emilia_ZH_EN_pinyin/vocab.txt")` in `repos/F5-TTS/src/f5_tts/train/datasets/prepare_csv_wavs.py`
-5. Prepare dataset: `(mindmirror) repos/F5-TTS$ ` `python src/f5_tts/train/datasets/prepare_csv_wavs.py ../mindmirror/data/MyVoice/ ./data/MyVoice_pinyin`
-6. Adjust `num_workers=os.cpu_count()` in `repos/F5-TTS/src/f5_tts/train/finetune_cli.py`
-7. Train on top of model F5TTS v1 base
-   * `(mindmirror) repos/F5-TTS$ ` `python src/f5_tts/train/finetune_cli.py --exp_name F5TTS_v1_Base --dataset_name MyVoice --finetune --pretrain ckpts/F5TTS_v1_Base/model_1250000.safetensors --tokenizer pinyin --learning_rate 5e-5 --epochs 50 --batch_size_type sample --batch_size_per_gpu 1 --grad_accumulation_steps 4     --save_per_updates 5000 --keep_last_n_checkpoints 1`
-8. Test loading the model `(mindmirror) repos/mindmirror$ ` `python scripts/test_inference.py` (or verify_model.py if it still exists)
-9. Test inference
-   * `(mindmirror) repos/F5-TTS$` `python src/f5_tts/infer/infer_cli.py --model F5TTS_v1_Base --ckpt_file ckpts/MyVoice/model_last.pt --ref_audio ../mindmirror/voice_samples/wavs_clean/paragraph_01.wav --ref_text "The birch canoe slid on the smooth planks." --gen_text "This is a test. I am checking if my voice model is overtrained."`
-10. Run the main pipeline: `(mindmirror) repos/mindmirror$ ` `PYTHONPATH=src python3 src/mindmirror/main.py`
+See the full step-by-step guide in the [TTS module README](src/mindmirror/tts/README.md#custom-voice-training-f5-tts-fine-tuning), which covers dataset recording, preparation, training, and inference testing.
 
 ## Development Milestones (Historical Context)
 
@@ -126,10 +115,4 @@ This script queries the Vertex AI model catalog, filters for chat/conversational
 * Integrated MS1, MS2 and MS3
 
 ### MS4: Voice cloning
-* Trying with F5-TTS
-  1. Install F5-TTS repository: clone and then `pip install -e .` 
-  2. Record voice sample: `PYTHONPATH=src python3 scripts/record_sample.py`
-  3. Prepare dataset: `python src/f5_tts/train/datasets/prepare_csv_wavs.py ../mindmirror/data/MyVoice/ ./data/MyVoice_pinyin`
-  4. Train on top of model F5TTS v1 base
-  5. Test inference
-  6. Run `PYTHONPATH=src python3 src/mindmirror/main.py`
+* Went with F5-TTS for high-quality diffusion-based voice cloning — see the [TTS module README](src/mindmirror/tts/README.md#custom-voice-training-f5-tts-fine-tuning) for the full fine-tuning workflow.

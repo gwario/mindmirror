@@ -181,11 +181,19 @@ def run_stt_loop(stt_class, stt_kwargs, log_queue, selected_device, text_queue, 
                 silence_counter = 0
                 if not is_speaking:
                     buffer.extend(list(preroll_buffer))
+                    if getattr(stt_engine, 'is_streaming', lambda: False)():
+                        stt_engine.start_stream(sample_rate)
+                        for old_chunk in preroll_buffer:
+                            stt_engine.send_chunk(old_chunk)
                 is_speaking = True
                 buffer.append(chunk)
+                if getattr(stt_engine, 'is_streaming', lambda: False)():
+                    stt_engine.send_chunk(chunk)
 
             elif is_speaking:
                 buffer.append(chunk)
+                if getattr(stt_engine, 'is_streaming', lambda: False)():
+                    stt_engine.send_chunk(chunk)
                 if is_silence_frame:
                     silence_counter += 1
                 else:
@@ -194,12 +202,17 @@ def run_stt_loop(stt_class, stt_kwargs, log_queue, selected_device, text_queue, 
                 if silence_counter > required_silence_chunks:
                     if len(buffer) * CHUNK_DURATION > MIN_AUDIO_LENGTH:
                         log_queue.put({'type': 'status', 'text': "⏳ Transcribing..."})
-                        full_audio = np.concatenate(buffer)
-                        text = stt_engine.transcribe(full_audio, sample_rate)
+                        if getattr(stt_engine, 'is_streaming', lambda: False)():
+                            text = stt_engine.end_stream()
+                        else:
+                            full_audio = np.concatenate(buffer)
+                            text = stt_engine.transcribe(full_audio, sample_rate)
                         if text:
                             log_queue.put({'type': 'user', 'text': text})
                             text_queue.put(text)
                     else:
                         log_queue.put({'type': 'status', 'text': "🚫 Too short"})
+                        if getattr(stt_engine, 'is_streaming', lambda: False)():
+                            stt_engine.end_stream()
 
                     buffer = []; is_speaking = False; silence_counter = 0

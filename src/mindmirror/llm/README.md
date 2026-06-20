@@ -42,7 +42,7 @@ HF_TOKEN=your_hugging_face_token_here
 
 ### 2. LLM Settings
 You can customize the model used in [config.py](../config.py):
-*   `GOOGLE_TTT_MODEL` (`gemini-flash-lite-latest`): The model version used for text generation. For latency-sensitive voice loops, lightweight models (like Flash-Lite) are recommended.
+*   `GOOGLE_TTT_MODEL` (e.g. `gemini-2.5-flash-lite`): The model version used for text generation. For latency-sensitive voice loops, lightweight models (like Flash-Lite) are recommended.
 
 ### 3. Model-Context Protocol (MCP) Integration
 The assistant can be extended with tools provided by MCP servers. You can define servers in [config.py](../config.py):

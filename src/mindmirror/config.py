@@ -85,7 +85,7 @@ F5_VOICE_NAME = "MyVoice"
 # Assuming F5-TTS is cloned alongside the main project root
 F5_LIB_PATH = PROJECT_ROOT.parent / "F5-TTS"
 F5_CKPT_PATH = str(F5_LIB_PATH / f"ckpts/{F5_VOICE_NAME}/model_last.pt")
-F5_VOCAB_FILE = str(F5_LIB_PATH / f"data/{F5_VOICE_NAME}_pinyin/vocab.txt")
+F5_VOCAB_FILE = str(F5_LIB_PATH / f"data/{F5_VOICE_NAME}_pinyin/vocab.txt")  # Pretrained pinyin vocab copied here by prepare_csv_wavs.py
 F5_WAVS_DIR = PROJECT_ROOT / f"data/{F5_VOICE_NAME}/wavs"
 F5_NFE_STEPS = 16
 F5_MIN_CHUNK_LENGTH = 40
@@ -103,9 +103,12 @@ GREETING_TRIGGER_TEXT = os.getenv("GREETING_TRIGGER_TEXT", "Greet the user short
 # --- GOOGLE APPLICATION CREDENTIALS ---
 GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 
+# --- STT SETTINGS (GOOGLE CLOUD) ---
+GOOGLE_STT_MODEL = os.getenv("GOOGLE_STT_MODEL")
+GOOGLE_STT_LANG = os.getenv("GOOGLE_STT_LANG")
+
 # --- LLM SETTINGS (GEMINI) ---
 GOOGLE_TTT_MODEL = os.getenv("GOOGLE_TTT_MODEL")
-GOOGLE_TTT_USE_VERTEXAI = os.getenv("GOOGLE_TTT_USE_VERTEXAI", "false").lower() == "true"
 GOOGLE_CLOUD_PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT")
 GOOGLE_CLOUD_LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION")
 

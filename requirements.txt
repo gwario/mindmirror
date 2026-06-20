@@ -6,10 +6,17 @@ pydantic>=2.0
 sounddevice
 soundfile
 numpy
+scipy
 torch
 openai-whisper
 piper-tts
 rich
 pyyaml
 python-dotenv
+# Google Cloud
 google-cloud-texttospeech>=2.16.0
+google-cloud-speech>=2.26.0
+google-genai
+# Audio processing
+librosa
+noisereduce

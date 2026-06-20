@@ -2,8 +2,6 @@
 
 The Speech-to-Text module is responsible for capturing audio input, processing it through Voice Activity Detection (VAD) to isolate spoken speech, detecting interruptions during assistant output, and transcribing user speech into text.
 
-By default, the STT interface is implemented using **OpenAI's Whisper** model.
-
 ## Interface Definition
 
 Any Speech-to-Text implementation must adhere to the contract defined in [interface.py](interface.py):
@@ -33,10 +31,14 @@ The STT class is configured inside [main.py](../main.py) directly:
 *   **AWS SageMaker Remote Whisper STT** (`SageMakerWhisperSTT`):
     *   Offloads inference tasks asynchronously to an external AWS SageMaker Endpoint hosting Whisper.
     *   Recommended if you are running the assistant on a CPU-only hardware environment to achieve low response latency.
+*   **Google Cloud Remote STT v2** (`GoogleCloudSTT`):
+    *   Uses Google Cloud's Speech-to-Text V2 API.
+    *   Streams audio chunks dynamically in real-time to regional Google Speech endpoints for lowest response latency.
+    *   Requires Google Cloud service account key authentication.
 
 ### 2. Environment Variables (`.env`)
 
-Define these settings in the root `.env` file if using AWS SageMaker mode:
+Define these settings in the root `.env` file depending on the selected mode:
 
 ```env
 # AWS Configuration (required if using SageMaker STT)
@@ -46,6 +48,10 @@ AWS_SAGEMAKER_WHISPER_ENDPOINT_NAME=whisper-large-v3-endpoint
 # AWS Credentials (if not already configured via AWS CLI profile)
 AWS_ACCESS_KEY_ID=your_aws_access_key
 AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+
+# Google Cloud STT Configuration (required if using Google STT)
+GOOGLE_STT_MODEL=latest_long
+GOOGLE_STT_LANG=en-gb
 ```
 
 ### 3. VAD and DSP Settings
