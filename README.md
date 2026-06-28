@@ -2,14 +2,18 @@
 
 MindMirror is an end-to-end, highly modular conversational AI voice assistant. It integrates Speech-to-Text (STT), Large Language Models (LLM), and Text-to-Speech (TTS) into a seamless, real-time pipeline. Designed with a clean, object-oriented architecture, it allows for easy swapping of models and configuration, making it a robust platform for local voice applications.
 
+## Origin
+
+MindMirror originated as a personal research experiment exploring the concept of *self-directed conversational AI* — specifically, whether a system could facilitate a real-time dialogue in which a user interacts with a language model that responds in their own synthesised voice. The hypothesis was that such a setup could serve as an audible externalisation of inner monologue, prompting deeper reflection through the medium of conversation. As the architecture evolved and additional components were integrated, the project naturally matured into a broader, general-purpose local voice assistant pipeline.
+
 ## Features
 - **Real-Time Voice Activity Detection (VAD):** Accurately captures speech while filtering out background noise using custom DSP and VAD logic.
 - **Interruption Support:** The system gracefully handles being interrupted while speaking, ducking its own audio and listening for keywords.
 - **Modular Pipeline Architecture:** Built using `multiprocessing` queues. The main entry point manages hardware selection, coordinates queue topologies, launches child processes, and handles graceful shutdowns.
-- **Multi-Model Support:** 
-  - **STT:** Powered by OpenAI Whisper.
-  - **LLM:** Powered by Google Gemini.
-  - **TTS:** Supports both lightweight, fast inference (PiperVoice) and advanced, fine-tuned voice cloning models (F5-TTS).
+- **Multi-Model Support:** Each pipeline stage is backed by swappable implementations behind a common interface:
+  - **STT:** `LocalWhisperSTT` (on-device, CUDA-accelerated), `SageMakerWhisperSTT` (AWS-offloaded, CPU-friendly), or `GoogleCloudSTT` (Google Cloud Speech-to-Text V2, streaming).
+  - **LLM:** `GeminiLLMClient` (Google Gemini via Vertex AI) with optional **MCP tool-use support** — connects to one or more MCP servers (stdio or SSE) and exposes their tools to the model for agentic interactions.
+  - **TTS:** `PiperTTS` (lightweight, fast, CPU-friendly), `F5TTS` (diffusion-based voice cloning, GPU recommended), or `GoogleCloudTTS` (Google Cloud Text-to-Speech with style control and multi-voice support).
 - **Centralized Configuration:** A single `config.py` acts as the source of truth for all thresholds, device settings, and model paths.
 
 ## Project Structure
