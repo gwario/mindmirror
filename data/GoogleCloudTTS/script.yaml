@@ -1,0 +1,39 @@
+# data/GoogleTTS_ReferenceVoice/script.yaml
+# ==========================================
+# Script for Google Chirp 3: Instant Custom Voice recording.
+#
+# The consent section MUST be recorded first and verbatim.
+# The other sections provide one reference sample per emotion to generate distinct keys.
+
+# --- CONSENT STATEMENT (mandatory, verbatim, ~7s) ---
+- category: "Consent Statement"
+  acting: "Clear, calm, natural pace. Read every word exactly as written."
+  lang: "en"
+  consent: true
+  lines:
+    - "I am the owner of this voice and I consent to Google using this voice to create a synthetic voice model."
+
+# --- REFERENCE AUDIO CLIPS (~10s each) ---
+- category: "Neutral"
+  acting: "Warm, clear, slightly smiling. Natural conversational pace."
+  lang: "en"
+  lines:
+    - "Good morning! I've reviewed your schedule for today. You have three meetings and a deadline at five o'clock. Would you like me to set a reminder?"
+
+- category: "Excited"
+  acting: "High energy, faster pace, varied pitch. Let your excitement come through clearly!"
+  lang: "en"
+  lines:
+    - "That is absolutely brilliant! I cannot believe how well that worked out — this is exactly the kind of result we were hoping for. Well done!"
+
+- category: "Serious"
+  acting: "Lower pitch, slower deliberate pace. Sound considered and authoritative."
+  lang: "en"
+  lines:
+    - "Please be careful before proceeding. The file you are about to delete contains important data that cannot be recovered. Are you certain you want to continue?"
+
+- category: "Casual"
+  acting: "Relaxed, slightly mumbled. Drop your guard. Sound like you're talking to a friend."
+  lang: "en"
+  lines:
+    - "Yeah, I think that's mostly right, actually. I mean, it's not perfect, but it should work well enough for now. We can always tweak it later if needed."

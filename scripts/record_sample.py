@@ -15,11 +15,12 @@ from mindmirror.ui.ui import console
 from mindmirror import config
 
 # ================= CONFIGURATION =================
-VOICE="MyVoice"
-OUTPUT_BASE = f"data/{VOICE}"
+VOICE = "MyVoice"
+F5TTS_BASE = "data/f5-tts"
+OUTPUT_BASE = os.path.join(F5TTS_BASE, VOICE)
 METADATA_FILE = os.path.join(OUTPUT_BASE, "metadata.csv")
 WAVS_DIR = os.path.join(OUTPUT_BASE, "wavs")
-SCRIPT_FILE = "script.yaml"
+SCRIPT_FILE = os.path.join(F5TTS_BASE, "script.yaml")
 
 
 def load_script(yaml_path):
@@ -86,7 +87,7 @@ def main():
 
             # Save
             path = os.path.join(WAVS_DIR, item['fname'])
-            sf.write(path, audio_clip, config.TARGET_SR)
+            sf.write(path, audio_clip, config.TARGET_SR, subtype='PCM_16')
 
             # Write Metadata
             # Note: F5-TTS usually expects relative paths like 'wavs/file.wav'

@@ -16,6 +16,7 @@ from mindmirror.llm.google.client import GeminiLLMClient
 from mindmirror.tts.pipervoice.tts import PiperTTS
 from mindmirror.tts.f5_tts.tts import F5TTS
 from mindmirror.tts.google import GoogleCloudTTS
+from mindmirror.tts.elevenlabs import ElevenLabsTTS
 
 # Generic runners
 from mindmirror.stt.runner import run_stt_loop
@@ -152,12 +153,16 @@ def main():
     # tts_kwargs = {}
 
     # Choice C: Google Cloud Remote TTS (High quality, requires internet connection and credentials)
-    tts_class = GoogleCloudTTS
-    tts_kwargs = {
-        "voice_name": config.GOOGLE_TTS_VOICE,
-        "language_code": config.GOOGLE_TTS_LANG,
-        "model_name": config.GOOGLE_TTS_MODEL
-    }
+    # tts_class = GoogleCloudTTS
+    # tts_kwargs = {
+    #     "voice_name": config.GOOGLE_TTS_VOICE,
+    #     "language_code": config.GOOGLE_TTS_LANG,
+    #     "model_name": config.GOOGLE_TTS_MODEL
+    # }
+
+    # Choice D: ElevenLabs Streaming TTS (High quality, low latency, requires API key)
+    tts_class = ElevenLabsTTS
+    tts_kwargs = {}
 
     # 4. INITIALIZE QUEUES
     stt_queue = Queue()       # STT -> TTT

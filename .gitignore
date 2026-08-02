@@ -1,5 +1,10 @@
 .env
-/data
+# Ignore all generated data (audio, keys, metadata) but keep the recording scripts
+/data/**
+!/data/f5-tts/
+!/data/f5-tts/script.yaml
+!/data/GoogleCloudTTS/
+!/data/GoogleCloudTTS/script.yaml
 /src/mindmirror/tts/pipervoice/en/semaine
 /test_excited.wav
 /test_lazy.wav

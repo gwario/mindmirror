@@ -4,7 +4,7 @@ The Text-to-Speech module is responsible for synthesizing text response segments
 
 ## Supported Engines
 
-The system features a dual-engine architecture. Selection is made by editing [main.py](../main.py) directly:
+The system features a multi-engine architecture. Selection is made by editing [main.py](../main.py) directly:
 
 1. **PiperVoice Engine** (`PiperTTS`)
 
@@ -64,6 +64,112 @@ F5_STYLES = {
     }
 }
 ```
+
+---
+
+## 3. Google Cloud Text-to-Speech Engine (`GoogleCloudTTS`)
+
+Google Cloud TTS offers high-fidelity, low-latency neural speech synthesis. It also supports **Chirp 3: Instant Custom Voice** to generate real-time voice clones with style/speed parameterisation.
+
+### Configuration
+All authentication, model selection, and profile keys are loaded via the root `.env` file:
+*   `GOOGLE_APPLICATION_CREDENTIALS`: Path to your service account credentials JSON.
+*   `GOOGLE_CLOUD_PROJECT`: Your GCP project ID.
+*   `GOOGLE_CLOUD_LOCATION`: The location/region for resource execution (e.g. `us-central1`).
+*   `GOOGLE_TTS_MODEL`: Set to `gemini-2.5-flash-preview-tts` (Chirp 3) or default standard voices.
+*   `GOOGLE_TTS_VOICE`: The voice catalog name (e.g. `Aoede`).
+*   `GOOGLE_TTS_LANG`: BCP-47 language locale matching the target voice (e.g. `en-gb`).
+
+### Style Parameterisation (`GOOGLE_TTS_STYLES`)
+Google Cloud TTS supports style directives through pitch, speaking rate, and custom text prompts in [config.py](../config.py):
+```python
+GOOGLE_TTS_STYLES = {
+    "neutral": {
+        "speaking_rate": 1.15, 
+        "pitch": 0.0,
+        "prompt": "Read aloud in a warm, welcoming tone."
+    },
+    "excited": {
+        "speaking_rate": 1.10, 
+        "pitch": 0.5,
+        "prompt": "Read aloud in an excited, high-energy, and enthusiastic tone."
+    },
+    "serious": {
+        "speaking_rate": 1.05, 
+        "pitch": -0.5,
+        "prompt": "Read aloud in a professional, slightly casual tone."
+    },
+    "lazy": {
+        "speaking_rate": 1.00, 
+        "pitch": -1.5,
+        "prompt": "Read aloud in a casual and relaxed tone."
+    },
+}
+```
+
+### Voice Cloning (Instant Custom Voice Key Generation)
+Chirp 3 supports generating short-lived voice cloning keys by coupling a mandatory consent recording with a reference audio sample:
+
+1.  **Record Consent & Reference Audio**:
+    Ensure your Conda environment is active and run the utility script (bypassing shell aliases if necessary):
+    ```bash
+    # (mindmirror) repos/mindmirror$
+    PYTHONPATH=src \python scripts/record_google_cloud_tts.py
+    ```
+    This script will walk you through:
+    *   Calibrating background noise.
+    *   Recording the mandatory consent statement (`consent_statement.wav`) verbatim.
+    *   Recording short, expressive reference clips across multiple emotional registers.
+2.  **Generate Cloning Key**:
+    At the end of the recording session, the script prompts you to verify credentials and call the GCP Text-to-Speech endpoint. The generated key is saved to:
+    ```text
+    data/GoogleCloudTTS/ReferenceVoice/voice_cloning_key.txt
+    ```
+3.  **Test the Cloning Key**:
+    You can test the quality and expressiveness of your cloned voice directly using the test script:
+    ```bash
+    # (mindmirror) repos/mindmirror$
+    PYTHONPATH=src \python scripts/test_google_cloud_tts.py
+    ```
+    This script prompts you to enter custom text, calls the Google Cloud TTS endpoint with your cloning key, plays back the synthesized audio, and saves the output to `test_google_voice.wav`.
+4.  **Applying the Key in the Pipeline**:
+    Once the key is generated at the specified location, `GoogleCloudTTS` will automatically load and apply it during the live assistant pipeline loop.
+
+---
+
+## 4. ElevenLabs Streaming TTS Engine (`ElevenLabsTTS`)
+
+ElevenLabs offers high-fidelity, ultra-low latency streaming voice synthesis. It excels in emotional expressiveness and provides an easy-to-use Instant Voice Cloning API.
+
+### Configuration
+Configure your API key and target voice in the root `.env` file:
+*   `ELEVENLABS_API_KEY`: Your ElevenLabs API Key.
+*   `ELEVENLABS_VOICE_ID`: The unique ID of the voice you want to use.
+*   `ELEVENLABS_MODEL_ID`: The model version, default is `eleven_multilingual_v2`.
+
+### Style Parameterisation (`ELEVENLABS_STYLES`)
+ElevenLabs allows for granular control over the generated voice's stability and similarity. This is mapped in [config.py](../config.py):
+```python
+ELEVENLABS_STYLES = {
+    "neutral": {"stability": 0.5, "similarity_boost": 0.75, "style": 0.0, "use_speaker_boost": True},
+    "excited": {"stability": 0.3, "similarity_boost": 0.85, "style": 0.3, "use_speaker_boost": True},
+    "serious": {"stability": 0.7, "similarity_boost": 0.65, "style": 0.0, "use_speaker_boost": True},
+    "lazy": {"stability": 0.4, "similarity_boost": 0.5, "style": 0.1, "use_speaker_boost": True},
+}
+```
+
+### Voice Cloning (Instant Voice Cloning)
+You can quickly create a clone of your own voice using the provided interactive script.
+1.  **Record and Clone**:
+    Ensure your Conda environment is active, then run:
+    ```bash
+    PYTHONPATH=src python3 scripts/record_elevenlabs_voice_clone.py --duration 10
+    ```
+    This script will:
+    *   Record audio directly from your microphone using `sounddevice` for the specified duration.
+    *   Save a temporary high-quality audio file.
+    *   Upload the file to the ElevenLabs API to generate an "Instant Voice Clone".
+    *   Offer to automatically update your `.env` file with the newly generated `ELEVENLABS_VOICE_ID`.
 
 ---
 

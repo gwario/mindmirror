@@ -13,15 +13,24 @@ MindMirror originated as a personal research experiment exploring the concept of
 - **Multi-Model Support:** Each pipeline stage is backed by swappable implementations behind a common interface:
   - **STT:** `LocalWhisperSTT` (on-device, CUDA-accelerated), `SageMakerWhisperSTT` (AWS-offloaded, CPU-friendly), or `GoogleCloudSTT` (Google Cloud Speech-to-Text V2, streaming).
   - **LLM:** `GeminiLLMClient` (Google Gemini via Vertex AI) with optional **MCP tool-use support** — connects to one or more MCP servers (stdio or SSE) and exposes their tools to the model for agentic interactions.
-  - **TTS:** `PiperTTS` (lightweight, fast, CPU-friendly), `F5TTS` (diffusion-based voice cloning, GPU recommended), or `GoogleCloudTTS` (Google Cloud Text-to-Speech with style control and multi-voice support).
+  - **TTS:** `PiperTTS` (lightweight, fast, CPU-friendly), `F5TTS` (diffusion-based voice cloning, GPU recommended), `GoogleCloudTTS` (Google Cloud Text-to-Speech with style control and multi-voice support), or `ElevenLabsTTS` (High-fidelity, ultra-low latency streaming, with Instant Voice Cloning).
 - **Centralized Configuration:** A single `config.py` acts as the source of truth for all thresholds, device settings, and model paths.
 
 ## Project Structure
 ```text
 mindmirror/
+├── data/
+│   ├── f5-tts/
+│   │   ├── script.yaml            # Recording script for F5-TTS voice dataset
+│   │   └── MyVoice/               # Voice-specific dataset output (wavs, metadata)
+│   └── GoogleCloudTTS/
+│       ├── script.yaml            # Recording script for Google Cloud TTS voice cloning
+│       └── ReferenceVoice/        # Voice-specific output (wavs, voice_cloning_key.txt)
 ├── scripts/
-│   ├── record_sample.py       # Utility for recording dataset samples for voice cloning
-│   └── test_inference.py      # Utility for testing fine-tuned voice models
+│   ├── record_sample.py           # Records voice samples for F5-TTS fine-tuning
+│   ├── record_google_cloud_tts.py  # Records consent + reference audio for Google Cloud TTS voice cloning
+│   ├── test_google_cloud_tts.py    # Tests synthesized voice clones using Google Cloud TTS
+│   └── test_inference.py          # Tests a fine-tuned F5-TTS voice model
 └── src/
     └── mindmirror/
         ├── config.py          # Centralized settings (Thresholds, Paths, Constants)
@@ -35,12 +44,21 @@ mindmirror/
 
 ## How to Run
 
-1. Create a Conda environment:
+1. Create and activate the Conda environment:
    ```bash
    conda create -n mindmirror python=3.11 -y
    conda activate mindmirror
-   pip install -r requirements.txt
+   
+   # Note: If you have aliases (e.g. alias python='python3'), bypass them by prefixing with a backslash:
+   \python -m pip install -r requirements.txt
    ```
+   > **Note:** If you see `externally-managed-environment` errors, it means a shell alias like `alias python='python3'` is redirecting your command to the system's Homebrew Python. Prefixing the command with a backslash (i.e. `\python`) forces the shell to bypass the alias and use the conda-activated path.
+   >
+   > To verify your path is correct:
+   > ```bash
+   > conda activate mindmirror
+   > which python   # should point to .../anaconda3/envs/mindmirror/bin/python
+   > ```
 2. Set up your API Keys and Settings:
    - Create a `.env` file in the root directory.
    - Configure the following settings:
@@ -73,6 +91,13 @@ mindmirror/
 
 
       # ==============================================================================
+      # ElevenLabs TTS & Voice Cloning
+      # ==============================================================================
+      ELEVENLABS_API_KEY=your_elevenlabs_api_key
+      ELEVENLABS_VOICE_ID=your_voice_id_here
+      ELEVENLABS_MODEL_ID=eleven_multilingual_v2
+
+      # ==============================================================================
       # Hugging Face
       # ==============================================================================
       HF_TOKEN=your_hugging_face_token_here    # Optional (Hugging Face Access Token)
@@ -83,13 +108,45 @@ mindmirror/
    - *Recommendation on STT & TTS selection in [main.py](src/mindmirror/main.py)*:
      - Open [main.py](src/mindmirror/main.py) to edit classes and options directly:
      - **STT Selection**: If you have a local GPU (**CUDA available**), we recommend using `LocalWhisperSTT` to run locally for free with sub-second latency. If running on **CPU only (no CUDA)**, uncomment `SageMakerWhisperSTT` to offload inference to AWS for faster response times.
-     - **TTS Selection**: If you have a local GPU (**CUDA available**), you can choose either `PiperTTS` or `F5TTS`. If running on **CPU only (no CUDA)**, we strongly recommend using `PiperTTS` as F5-TTS uses diffusion and will be extremely slow to synthesize speech on a CPU.
+     - **TTS Selection**: If you have a local GPU (**CUDA available**), you can choose either `PiperTTS` or `F5TTS`. If running on **CPU only (no CUDA)**, we strongly recommend using `PiperTTS` as F5-TTS uses diffusion and will be extremely slow to synthesize speech on a CPU. Alternatively, if you want high-quality cloud voices, you can use `GoogleCloudTTS` or `ElevenLabsTTS`.
 3. Configure your TTS:
+
+   #### PiperTTS *(lightweight, CPU-friendly, no setup beyond model files)*
    - Create the directory `src/mindmirror/tts/pipervoice/en/semaine/` (or update `src/mindmirror/config.py` to point elsewhere).
    - Download the default **Semaine (medium)** British English voice model files from the official Rhasspy repository:
      - [en_GB-semaine-medium.onnx](https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_GB/semaine/medium/en_GB-semaine-medium.onnx?download=true)
      - [en_GB-semaine-medium.onnx.json](https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_GB/semaine/medium/en_GB-semaine-medium.onnx.json?download=true)
    - Place both files in that `semaine/` folder.
+
+   #### F5-TTS *(diffusion-based voice cloning, GPU recommended)*
+   - Record your voice dataset using the provided script — it loads lines from `data/f5-tts/script.yaml`:
+     ```bash
+     PYTHONPATH=src python3 scripts/record_sample.py
+     ```
+   - See the full fine-tuning guide (dataset prep, training, inference testing) in the [TTS module README](src/mindmirror/tts/README.md#custom-voice-training-f5-tts-fine-tuning).
+   - Update `F5_CKPT_PATH` and related paths in `src/mindmirror/config.py` to point to your trained checkpoint.
+
+   #### GoogleCloudTTS *(cloud-based, Chirp 3 Instant Custom Voice cloning)*
+   - Requires a GCP project with the Cloud Text-to-Speech API enabled and valid credentials configured in step 2.
+   - Set `GOOGLE_TTS_MODEL`, `GOOGLE_TTS_VOICE`, and `GOOGLE_TTS_LANG` in your `.env` (see step 2).
+   - To clone your own voice using **Instant Custom Voice**, run the consent & reference recording script — it loads texts from `data/GoogleCloudTTS/script.yaml`:
+     ```bash
+     PYTHONPATH=src python3 scripts/record_google_cloud_tts.py
+     ```
+     This will guide you through:
+     1. Recording the mandatory consent statement (verbatim, ≤ 10 s).
+     2. Recording expressive ~10 s reference audio clips across multiple styles.
+     3. (Optional) Submitting both clips to the Google API to generate a **Voice Cloning Key**, saved to `data/GoogleCloudTTS/ReferenceVoice/voice_cloning_key.txt`.
+    - Pass the generated key to `GoogleCloudTTS` via the `voice_clone.voice_cloning_key` field in your synthesis requests.
+
+    #### ElevenLabsTTS *(cloud-based, high-quality streaming and Instant Voice Cloning)*
+    - Requires an ElevenLabs API key.
+    - Set `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` in your `.env`.
+    - To clone your own voice instantly, you can use the interactive script:
+      ```bash
+      PYTHONPATH=src python3 scripts/record_elevenlabs_voice_clone.py --duration 10
+      ```
+      This will record your voice from the microphone, upload it to ElevenLabs, generate a cloned voice, and can automatically inject the new `ELEVENLABS_VOICE_ID` into your `.env`.
 4. Run the application:
    ```bash
    PYTHONPATH=src python3 src/mindmirror/main.py

@@ -18,9 +18,9 @@ INPUT_DEVICE_TEST_DURATION = 3.0
 OUTPUT_DEVICE_TEST_DURATION = 1.5
 
 # --- DSP SETTINGS ---
-HIGHPASS_FREQ = 80
-NR_STRENGTH = 0.35
-TRIM_DB = 30
+HIGHPASS_FREQ = int(os.getenv("HIGHPASS_FREQ", "80"))
+NR_STRENGTH = float(os.getenv("NR_STRENGTH", "0.35"))
+TRIM_DB = int(os.getenv("TRIM_DB", "30"))
 PAD_DURATION = 0.1
 NORMALIZE_TARGET = 0.90
 MIN_NOISE_FLOOR = 0.005
@@ -78,6 +78,17 @@ GOOGLE_TTS_STYLES = {
         "pitch": -1.5,
         "prompt": "Read aloud in a casual and relaxed tone."
     },
+}
+
+# --- TTS SETTINGS (ELEVENLABS) ---
+ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
+ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID")
+ELEVENLABS_MODEL_ID = os.getenv("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2")
+ELEVENLABS_STYLES = {
+    "neutral": {"stability": 0.5, "similarity_boost": 0.75, "style": 0.0, "use_speaker_boost": True},
+    "excited": {"stability": 0.3, "similarity_boost": 0.85, "style": 0.3, "use_speaker_boost": True},
+    "serious": {"stability": 0.7, "similarity_boost": 0.65, "style": 0.0, "use_speaker_boost": True},
+    "lazy": {"stability": 0.4, "similarity_boost": 0.5, "style": 0.1, "use_speaker_boost": True},
 }
 
 # --- TTS SETTINGS (F5) ---

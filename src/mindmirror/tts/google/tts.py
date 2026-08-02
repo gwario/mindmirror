@@ -83,11 +83,28 @@ class GoogleCloudTTS(TTSInterface):
                 else:
                     normalized_lang = normalized_lang.lower()
 
-                voice = texttospeech.VoiceSelectionParams(
-                    language_code=normalized_lang,
-                    name=self.voice_name,
-                    model_name=self.model_name
-                )
+                voice_clone_params = None
+                key_path = os.path.join("data/GoogleCloudTTS/ReferenceVoice/voice_cloning_key.txt")
+                if os.path.exists(key_path):
+                    try:
+                        with open(key_path, "r") as f:
+                            voice_key = f.read().strip()
+                        if voice_key:
+                            voice_clone_params = texttospeech.VoiceCloneParams(voice_cloning_key=voice_key)
+                    except Exception as e:
+                        log_queue.put({'type': 'error', 'text': f"TTS: Error reading voice cloning key: {e}"})
+
+                if voice_clone_params:
+                    voice = texttospeech.VoiceSelectionParams(
+                        language_code=normalized_lang,
+                        voice_clone=voice_clone_params
+                    )
+                else:
+                    voice = texttospeech.VoiceSelectionParams(
+                        language_code=normalized_lang,
+                        name=self.voice_name,
+                        model_name=self.model_name
+                    )
 
                 # Request LINEAR16 PCM at 24000Hz
                 audio_config = texttospeech.AudioConfig(
