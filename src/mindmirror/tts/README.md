@@ -111,7 +111,7 @@ GOOGLE_TTS_STYLES = {
 Chirp 3 supports generating short-lived voice cloning keys by coupling a mandatory consent recording with a reference audio sample:
 
 1.  **Record Consent & Reference Audio**:
-    Ensure your Conda environment is active and run the utility script (bypassing shell aliases if necessary):
+    Ensure your virtual environment (.venv) is active and run the utility script (bypassing shell aliases if necessary):
     ```bash
     # (mindmirror) repos/mindmirror$
     PYTHONPATH=src \python scripts/record_google_cloud_tts.py
@@ -161,7 +161,7 @@ ELEVENLABS_STYLES = {
 ### Voice Cloning (Instant Voice Cloning)
 You can quickly create a clone of your own voice using the provided interactive script.
 1.  **Record and Clone**:
-    Ensure your Conda environment is active, then run:
+    Ensure your virtual environment (.venv) is active, then run:
     ```bash
     PYTHONPATH=src python3 scripts/record_elevenlabs_voice_clone.py --duration 10
     ```

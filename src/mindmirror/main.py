@@ -4,6 +4,12 @@ import sys
 import time
 import argparse
 from multiprocessing import Process, Queue, active_children
+from pathlib import Path
+
+# Ensure src directory is in sys.path
+src_dir = str(Path(__file__).resolve().parent.parent)
+if src_dir not in sys.path:
+    sys.path.insert(0, src_dir)
 
 from mindmirror import audio, config
 from mindmirror.ui.console import console_process
@@ -13,6 +19,7 @@ from mindmirror.stt.local_whisper import LocalWhisperSTT
 from mindmirror.stt.aws_whisper import SageMakerWhisperSTT
 from mindmirror.stt.google import GoogleCloudSTT
 from mindmirror.llm.google.client import GeminiLLMClient
+from mindmirror.llm.langchain import LangChainLLMClient
 from mindmirror.tts.pipervoice.tts import PiperTTS
 from mindmirror.tts.f5_tts.tts import F5TTS
 from mindmirror.tts.google import GoogleCloudTTS
@@ -33,6 +40,12 @@ Match the user's energy — casual and conversational when they're relaxed,
 precise and focused when they mean business. Talk like a knowledgeable
 mate, not a textbook. Stay confident, encouraging, and to the point.
 
+Capabilities & Memory:
+- You are equipped with long-term persistent vector memory (ChromaDB).
+- You can store facts, preferences, and personal details into ChromaDB using `remember_fact`.
+- You can look up stored memories, past context, and ChromaDB contents using `recall_memories`.
+- Always use `recall_memories` when asked about your stored memories, ChromaDB, or past context. Never claim you lack access to ChromaDB or memory.
+
 When you reply, strictly prepend a style tag to your message. 
 Available tags: [NEUTRAL], [EXCITED], [SERIOUS], [LAZY].
 
@@ -46,7 +59,7 @@ Rules:
 Example: '[EXCITED] I found the file you were looking for!'
 
 If you use multiple styles within your answer, then keep the scope of the styled section short, especially for [EXCITED]. 
-"""
+""".strip()
 
 def clean_stale_locks():
     """Removes any lock files left over from previous crashes."""
@@ -140,8 +153,16 @@ def main():
     }
 
     # --- Text-To-Thought (TTT / LLM) Selection ---
-    ttt_class = GeminiLLMClient
-    ttt_kwargs = {"model_name": config.GOOGLE_TTT_MODEL}
+    # Choice A: LangChain TTT (Multi-provider LLM backend: ChatVertexAI, ChatGoogleGenerativeAI, ChatOpenAI, etc.)
+    ttt_class = LangChainLLMClient
+    ttt_kwargs = {
+        "model_name": config.LANGCHAIN_TTT_MODEL,
+        "provider": config.LANGCHAIN_TTT_PROVIDER
+    }
+
+    # Choice B: Direct Google GenAI SDK Client
+    # ttt_class = GeminiLLMClient
+    # ttt_kwargs = {"model_name": config.GOOGLE_TTT_MODEL}
 
     # --- Text-To-Speech (TTS) Selection ---
     # Choice A: Piper TTS (Fast ONNX CPU synthesis)

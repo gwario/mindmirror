@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from google.api_core import exceptions
 
 from mindmirror import config
-from mindmirror.llm.google.mcp_client import MCPClientManager
+from mindmirror.mcp_client import MCPClientManager
 
 def strip_markdown(text):
     """Remove markdown formatting but preserve all text content including code"""

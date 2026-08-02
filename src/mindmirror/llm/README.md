@@ -2,7 +2,7 @@
 
 The Text-to-Thought module forms the conversational brain of the assistant. It accepts text transcripts from the Speech-to-Text module, processes them using a Large Language Model (LLM) with tool access via Model-Context Protocol (MCP) servers, and outputs response blocks that are synthesised to audio by the Text-to-Speech (TTS) module.
 
-The default TTT interface is implemented using **Google Gemini** models.
+The default TTT interface is implemented using **LangChain & DeepAgents** (`LangChainLLMClient`) supporting Google Gemini backends (`vertexai` and `google`) as well as the direct **Google Gemini** SDK (`GeminiLLMClient`).
 
 ## Interface Definition
 
@@ -42,7 +42,10 @@ HF_TOKEN=your_hugging_face_token_here
 
 ### 2. LLM Settings
 You can customize the model used in [config.py](../config.py):
-*   `GOOGLE_TTT_MODEL` (e.g. `gemini-2.5-flash-lite`): The model version used for text generation. For latency-sensitive voice loops, lightweight models (like Flash-Lite) are recommended.
+*   `LANGCHAIN_TTT_PROVIDER` (`vertexai` | `google`): Selects the backend provider wrapper (defaults to `vertexai`).
+*   `LANGCHAIN_TTT_MODEL` (e.g. `gemini-2.5-flash-lite`): Model selection for text generation.
+*   `LANGCHAIN_TEMPERATURE` (e.g. `0.7`): Model temperature setting.
+*   `GOOGLE_TTT_MODEL` (e.g. `gemini-2.5-flash-lite`): Fallback model version used when running direct Gemini SDK client (`GeminiLLMClient`).
 
 ### 3. Model-Context Protocol (MCP) Integration
 The assistant can be extended with tools provided by MCP servers. You can define servers in [config.py](../config.py):
@@ -62,3 +65,11 @@ When initialized:
 1.  The assistant connects to all configured MCP servers.
 2.  It discovers available tools and converts their schemas to Google GenAI types.
 3.  When the model issues a tool call request, `GeminiLLMClient` executes the callback, performs the operation, and feeds the output back into the model's active chat context.
+
+---
+
+### 4. Persistent Vector Memory (ChromaDB) & Memory Skill
+The agent incorporates long-term vector memory using **ChromaDB** located in `data/chroma_db/`:
+*   `remember_fact(fact, category)`: Stores user preferences, facts, and key details into vector memory.
+*   `recall_memories(query, limit)`: Performs similarity search over past stored memories.
+*   **Persistent Memory Skill**: The agent system prompt includes instructions instructing the model to invoke `remember_fact` whenever the user says "remember this" or shares personal facts, and to query `recall_memories` when past context is needed.

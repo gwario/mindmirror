@@ -14,10 +14,18 @@ piper-tts
 rich
 pyyaml
 python-dotenv
-# Google Cloud
+
+# Google Cloud & Gemini
 google-cloud-texttospeech>=2.16.0
 google-cloud-speech>=2.26.0
 google-genai
+
+# LangChain, DeepAgents & Vector Memory
+langchain[google-genai]
+deepagents
+chromadb>=0.5.0
+langchain-chroma>=0.1.0
+
 # Audio processing
 librosa
 noisereduce

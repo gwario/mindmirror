@@ -44,21 +44,14 @@ mindmirror/
 
 ## How to Run
 
-1. Create and activate the Conda environment:
+1. Create and activate the virtual environment (Python 3.12.10 via pyenv):
    ```bash
-   conda create -n mindmirror python=3.11 -y
-   conda activate mindmirror
+   # Create and activate virtual environment (Python 3.12.10)
+   ~/.pyenv/versions/3.12.10/bin/python -m venv .venv
+   source .venv/bin/activate
    
-   # Note: If you have aliases (e.g. alias python='python3'), bypass them by prefixing with a backslash:
-   \python -m pip install -r requirements.txt
+   pip install -r requirements.txt
    ```
-   > **Note:** If you see `externally-managed-environment` errors, it means a shell alias like `alias python='python3'` is redirecting your command to the system's Homebrew Python. Prefixing the command with a backslash (i.e. `\python`) forces the shell to bypass the alias and use the conda-activated path.
-   >
-   > To verify your path is correct:
-   > ```bash
-   > conda activate mindmirror
-   > which python   # should point to .../anaconda3/envs/mindmirror/bin/python
-   > ```
 2. Set up your API Keys and Settings:
    - Create a `.env` file in the root directory.
    - Configure the following settings:
@@ -70,11 +63,14 @@ mindmirror/
       GOOGLE_CLOUD_PROJECT=886498416680         # Your Google Cloud Project ID
       GOOGLE_CLOUD_LOCATION=us-central1         # Your Google Cloud Location
 
-      # Model Selection
-      GOOGLE_TTT_MODEL=gemini-2.5-flash-lite         # Default Gemini model
+      # LangChain & Model Selection
+      LANGCHAIN_TTT_PROVIDER=vertexai           # 'vertexai' or 'google'
+      LANGCHAIN_TTT_MODEL=gemini-2.5-flash-lite  # Default Gemini model for TTT
+      LANGCHAIN_TEMPERATURE=0.7                  # Temperature for TTT generation
+      GOOGLE_TTT_MODEL=gemini-2.5-flash-lite     # Direct Gemini SDK fallback model
       GOOGLE_TTS_MODEL=gemini-2.5-flash-preview-tts  # Default TTS model
       GOOGLE_TTS_VOICE=Aoede                     # Default TTS voice
-      GOOGLE_TTS_LANG=en-gb                      # Default TTS language (align with GOOGLE_STT_LANG)
+      GOOGLE_TTS_LANG=en-gb                      # Default TTS language (independent of STT language)
 
 
       # ==============================================================================
@@ -149,7 +145,7 @@ mindmirror/
       This will record your voice from the microphone, upload it to ElevenLabs, generate a cloned voice, and can automatically inject the new `ELEVENLABS_VOICE_ID` into your `.env`.
 4. Run the application:
    ```bash
-   PYTHONPATH=src python3 src/mindmirror/main.py
+   python src/mindmirror/main.py
    ```
 
 ### Checking Available Google Cloud Models:

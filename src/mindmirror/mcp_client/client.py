@@ -7,7 +7,7 @@ from mcp.client.sse import sse_client
 class MCPClientManager:
     """
     Manages connections to one or more MCP servers.
-    Hides all MCP-specific connection details from the LLM client.
+    Hides all MCP-specific connection details from LLM engines and agents.
     """
     def __init__(self, servers_config, log_queue):
         self.servers_config = servers_config

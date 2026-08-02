@@ -18,7 +18,8 @@ def run_stt_loop(stt_class, stt_kwargs, log_queue, selected_device, text_queue, 
     stt_engine = stt_class(**stt_kwargs, log_queue=log_queue)
     try:
         stt_engine.load_model()
-    except Exception:
+    except Exception as e:
+        log_queue.put({'type': 'error', 'text': f"❌ STT Engine Load Failed: {e}"})
         return
 
     sample_rate = audio.get_valid_samplerate(selected_device)
