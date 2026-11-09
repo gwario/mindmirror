@@ -1,4 +1,6 @@
 from abc import ABC, abstractmethod
+from typing import Iterator
+import numpy as np
 
 class TTSInterface(ABC):
     """
@@ -17,3 +19,10 @@ class TTSInterface(ABC):
             control_queue: Multiprocessing Queue receiving playback control commands.
         """
         pass
+
+    def synthesize(self, text: str, style: str = "NEUTRAL") -> list[bytes]:
+        """
+        Pure synthesis method converting text and emotional style into raw PCM audio chunks.
+        Decoupled from hardware audio output devices for headless simulation and testing.
+        """
+        return []

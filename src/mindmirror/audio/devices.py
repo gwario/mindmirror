@@ -103,10 +103,11 @@ def select_audio_device(device_type='input'):
             if channel_count > 0:
                 valid_devices.append((i, device))
 
-                if device_type == 'input':
-                    default_marker = " [DEFAULT]" if i == sd.default.device else ""
-                else:
-                    default_marker = " [DEFAULT]" if i == sd.default.device else ""
+                try:
+                    default_idx = sd.default.device[0] if device_type == 'input' else sd.default.device[1]
+                except Exception:
+                    default_idx = sd.default.device
+                default_marker = " [DEFAULT]" if i == default_idx else ""
 
                 print(f"  {i}: {device['name']}{default_marker}")
                 print(f"      Channels: {channel_count}, "
@@ -128,15 +129,20 @@ def select_audio_device(device_type='input'):
             continue
 
         if device_input == "":
-            if device_type == 'input':
-                default_id = sd.default.device
-            else:
-                default_id = sd.default.device
-
-            default_device = sd.query_devices(default_id)
-            default_sr = int(default_device['default_samplerate'])
-            print(f"✅ Using default {device_type}: {default_device['name']} @ {default_sr}Hz")
-            return default_id, default_sr
+            try:
+                default_device = sd.query_devices(kind=device_type)
+                try:
+                    default_id = int(sd.default.device[0] if device_type == 'input' else sd.default.device[1])
+                    if default_id < 0:
+                        default_id = default_device.get('index', None)
+                except Exception:
+                    default_id = default_device.get('index', None)
+                default_sr = int(default_device['default_samplerate'])
+                print(f"✅ Using default {device_type}: {default_device['name']} @ {default_sr}Hz")
+                return default_id, default_sr
+            except Exception as e:
+                print(f"⚠️  Could not load default {device_type} device: {e}")
+                continue
 
         try:
             device_id = int(device_input)
@@ -195,7 +201,7 @@ def safe_open_stream(device_id, sample_rate, channels=1, **kwargs):
         print(f"⚠️  Device {device_id} unavailable: {e}")
         print("🔄 Falling back to default device...")
 
-        default_device = sd.query_devices(sd.default.device)
+        default_device = sd.query_devices(kind='input')
         default_sr = int(default_device['default_samplerate'])
 
         stream = sd.InputStream(
@@ -238,3 +244,55 @@ def ask_headphones_mode():
             return True
         else:
             print("⚠️  Invalid input. Please enter 'y' or 'n'.")
+
+
+def find_audio_device(pattern: str | int | None, device_type: str = "input") -> tuple[int | None, int]:
+    """Finds an audio device matching a pattern (e.g. 'bluetooth', 'airpods', 'headset', device index).
+
+    Returns:
+        (device_index, sample_rate)
+    """
+    if pattern is None or pattern == "" or str(pattern).lower() in ("default", "none"):
+        return None, 16000
+
+    # If already an integer or integer string
+    try:
+        idx = int(pattern)
+        try:
+            dev = sd.query_devices(idx)
+            sr = int(dev.get("default_samplerate", 16000))
+            return idx, sr
+        except Exception:
+            return idx, 16000
+    except ValueError:
+        pass
+
+    # Pattern search across sounddevice device list
+    pattern_lower = str(pattern).lower()
+    try:
+        devices = sd.query_devices()
+        for idx, dev in enumerate(devices):
+            name = dev.get("name", "").lower()
+            is_input = dev.get("max_input_channels", 0) > 0
+            is_output = dev.get("max_output_channels", 0) > 0
+
+            matches = pattern_lower in name
+            # Special aliases for bluetooth
+            if pattern_lower in ("bluetooth", "bt", "wireless"):
+                matches = matches or any(kw in name for kw in ("bluez", "airpod", "headset", "buds", "wh-", "wf-"))
+
+            if matches:
+                if device_type == "input" and is_input:
+                    sr = int(dev.get("default_samplerate", 16000))
+                    print(f"🎙️ Found matching input device [{idx}]: {dev.get('name')}")
+                    return idx, sr
+                elif device_type == "output" and is_output:
+                    sr = int(dev.get("default_samplerate", 16000))
+                    print(f"🔊 Found matching output device [{idx}]: {dev.get('name')}")
+                    return idx, sr
+    except Exception as e:
+        print(f"⚠️ Error querying sound devices: {e}")
+
+    print(f"⚠️ No matching {device_type} device found for '{pattern}'. Using system default.")
+    return None, 16000
+

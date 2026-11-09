@@ -10,6 +10,7 @@ from mindmirror.config import (
     POST_PLAYBACK_COOLDOWN
 )
 from mindmirror import audio
+from mindmirror.audio.playback import PlaybackState
 from mindmirror.ui import meters
 from mindmirror.stt.vad import VADEngine
 
@@ -70,9 +71,10 @@ def run_stt_loop(stt_class, stt_kwargs, log_queue, selected_device, text_queue, 
 
         was_muted = False
         while True:
-            # Check Playback and Cooldown
-            playback_active = os.path.exists(PLAYBACK_LOCK)
-            speaking_active = os.path.exists(LOCK_FILE)
+            # Check Playback and Cooldown via PlaybackState (fallback to legacy lock file)
+            playback_state = PlaybackState.get_instance()
+            playback_active = playback_state.is_playback_active or os.path.exists(PLAYBACK_LOCK)
+            speaking_active = playback_state.is_mic_muted or os.path.exists(LOCK_FILE)
             if playback_active:
                 last_playback_time = time.time()
 
@@ -117,7 +119,7 @@ def run_stt_loop(stt_class, stt_kwargs, log_queue, selected_device, text_queue, 
             preroll_buffer.append(chunk)
 
             # --- INTERRUPTION DETECTION ---
-            if os.path.exists(PLAYBACK_LOCK):
+            if playback_state.is_playback_active or os.path.exists(PLAYBACK_LOCK):
                 energy = np.sqrt(np.mean(chunk**2)) * 10
                 playback_baseline_window.append(energy)
                 

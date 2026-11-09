@@ -9,9 +9,21 @@ Any Speech-to-Text implementation must adhere to the contract defined in [interf
 *   **`load_model(self) -> None`**: Initialises the model weights locally or setups remote boto3 clients.
 *   **`transcribe(self, audio_data: np.ndarray, sample_rate: int) -> str`**: Decodes a single-channel raw float audio buffer and returns the transcribed text.
 
-The codebase implements this interface across two distinct classes:
-1.  **`LocalWhisperSTT`** in [local.py](local_whisper/local.py): Uses the local `whisper` library. Handles CUDA-based GPU routing or multi-threaded CPU limits dynamically.
-2.  **`SageMakerWhisperSTT`** in [sagemaker.py](aws_whisper/sagemaker.py): Establishes a remote `boto3` SageMaker Runtime client and forwards binary audio requests to the specified model endpoint.
+The codebase implements this interface across four classes:
+1.  **`FasterWhisperSTT`** in [faster_whisper.py](local_whisper/faster_whisper.py): High-performance local STT engine using `faster-whisper` (CTranslate2) with `int8` quantisation on CPU and `float16` on CUDA GPU.
+2.  **`LocalWhisperSTT`** in [local.py](local_whisper/local.py): Uses the local `openai-whisper` library. Handles CUDA-based GPU routing or multi-threaded CPU limits dynamically.
+3.  **`SageMakerWhisperSTT`** in [sagemaker.py](aws_whisper/sagemaker.py): Establishes a remote `boto3` SageMaker Runtime client and forwards binary audio requests to the specified model endpoint.
+4.  **`GoogleCloudSTT`** in [stt.py](google/stt.py): Streams audio chunks in real-time to Google Cloud Speech-to-Text V2.
+
+## Supervised Pipeline Components & Microservice
+
+In addition to the multiprocessing loop in [runner.py](runner.py), the STT subsystem provides event-driven `PipelineComponent` implementations for the `MessageBus` architecture:
+*   **`VADComponent`** in [vad.py](vad.py): Subscribes to `audio.raw`, performs adaptive noise-floor Voice Activity Detection via `VADEngine`, publishes segmented speech buffers to `vad.speech_audio`, dynamically adapts pause thresholds (`vad_silence_duration`) on `speaker.identified`, and emits `control.interrupt` on acoustic barge-in during active playback.
+*   **`STTComponent`** in [component.py](component.py): Subscribes to `vad.speech_audio`, runs non-blocking transcription in a worker thread, and publishes transcripts to `stt.transcript`.
+*   **Microservice Entrypoint** ([service.py](service.py)): Runs `VADComponent` and `STTComponent` under `ComponentSupervisor`:
+    ```bash
+    python -m mindmirror.stt.service
+    ```
 
 ---
 
@@ -56,6 +68,7 @@ GOOGLE_STT_LANG=en-gb
 
 ### 3. VAD and DSP Settings
 Centralised constants in [config.py](../config.py) adjust the sound capture thresholds:
-*   `SPEECH_THRESHOLD_MULTIPLIER` (`4.0`): Dynamic threshold multiplier determining when user input speech starts.
-*   `SILENCE_DURATION` (`2.0`): Duration of silence in seconds to mark the end of user input and trigger transcription.
-*   `MIN_AUDIO_LENGTH` (`0.8`): Minimum duration of speech required in seconds before triggering transcription (filters out short mouth noises or clicks).
+*   `SPEECH_THRESHOLD_MULTIPLIER` (`2.2`): Dynamic threshold multiplier over the adaptive noise floor determining when user speech starts.
+*   `SILENCE_THRESHOLD_MULTIPLIER` (`1.4`): Dynamic threshold multiplier determining when a frame is classified as silence.
+*   `SILENCE_DURATION` (`1.2`): Duration of silence in seconds to mark the end of user input and trigger transcription (dynamically overridden per speaker in `VADComponent`).
+*   `MIN_AUDIO_LENGTH` (`0.5`): Minimum duration of speech required in seconds before triggering transcription (filters out short clicks or background transients).

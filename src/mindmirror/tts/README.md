@@ -238,3 +238,16 @@ To train F5-TTS on your own voice, follow these steps. All commands assume two s
     # (mindmirror) repos/mindmirror$
     PYTHONPATH=src python3 src/mindmirror/main.py
     ```
+
+---
+
+## Supervised TTS Component & Playback Architecture
+
+Alongside the multiprocessing runner ([runner.py](runner.py)), the TTS module supports the event-driven `MessageBus` pipeline:
+*   **Headless Synthesis Contract (`TTSInterface.synthesize`)**: Defined in [interface.py](interface.py), converting `(text, style)` into raw 16-bit PCM byte chunks decoupled from physical audio output hardware.
+*   **`TTSComponent`** ([component.py](component.py)): Subscribes to `ttt.response` and `control.interrupt`. Strips and parses the leading `[NEUTRAL]`, `[EXCITED]`, `[SERIOUS]`, or `[LAZY]` tag via `parse_style_tag()`, resolves per-speaker voice parameters (`tts_voice_id`, `tts_pitch`, `tts_speaking_rate`) from `SpeakerProfileStore`, and streams synthesised PCM chunks to `audio.playback`.
+*   **`PlaybackLoop` & `PlaybackState`** ([../audio/playback.py](../audio/playback.py)): Consumes `audio.playback` frames, coordinates mic muting (`control.mute_mic`, `control.playback_active`), and drains audio buffers in `< 30ms` upon receiving `control.interrupt`.
+*   **Microservice Entrypoint** ([service.py](service.py)):
+    ```bash
+    python -m mindmirror.tts.service
+    ```

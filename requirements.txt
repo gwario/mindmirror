@@ -10,10 +10,17 @@ numpy
 scipy
 torch
 openai-whisper
+faster-whisper>=1.0.0
 piper-tts
 rich
 pyyaml
 python-dotenv
+
+# Transport & Messaging
+pyzmq>=26.0.0
+msgpack>=1.0.0
+redis>=5.0.0
+nats-py>=2.7.0
 
 # Google Cloud & Gemini
 google-cloud-texttospeech>=2.16.0
@@ -30,3 +37,7 @@ langchain-chroma>=0.1.0
 librosa
 noisereduce
 elevenlabs>=1.0.0
+
+# Testing & Simulation
+pytest>=8.0.0
+pytest-asyncio>=0.23.0

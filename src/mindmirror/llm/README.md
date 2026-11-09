@@ -69,7 +69,24 @@ When initialized:
 ---
 
 ### 4. Persistent Vector Memory (ChromaDB) & Memory Skill
-The agent incorporates long-term vector memory using **ChromaDB** located in `data/chroma_db/`:
-*   `remember_fact(fact, category)`: Stores user preferences, facts, and key details into vector memory.
-*   `recall_memories(query, limit)`: Performs similarity search over past stored memories.
-*   **Persistent Memory Skill**: The agent system prompt includes instructions instructing the model to invoke `remember_fact` whenever the user says "remember this" or shares personal facts, and to query `recall_memories` when past context is needed.
+The agent incorporates long-term speaker-partitioned vector memory using **ChromaDB** ([chroma_store.py](../memory/chroma_store.py) & [chroma_client.py](../memory/chroma_client.py)) stored locally in `data/chroma_db/` (or via a remote ChromaDB server when `CHROMA_HOST` is reachable, with automatic local fallback):
+*   `remember_fact(fact, category, speaker_id)`: Stores user preferences, facts, and key details into vector memory. Unresolved speakers are buffered and retroactively tagged when `speaker.identified` fires on the message bus.
+*   `recall_memories(query, limit, speaker_id)`: Performs similarity search over stored memories, optionally filtered by `speaker_id`.
+*   **Persistent Memory Skill**: Defined in [data/skills/persistent-memory/SKILL.md](../../../data/skills/persistent-memory/SKILL.md) and loaded via DeepAgents' `SkillsMiddleware`.
+
+---
+
+## Supervised Reasoning Architecture & Pluggable Strategies
+
+For distributed and message-bus deployments, the LLM subsystem provides a supervised `ReasoningComponent` ([component.py](component.py)) and microservice runner ([service.py](service.py)):
+
+*   **`ReasoningComponent`** ([component.py](component.py)): Subscribes to `stt.transcript`, updates sliding-window conversation history via `ContextManager` ([context/manager.py](context/manager.py)), executes the active `ReasoningStrategy`, prunes internal deliberation traces after each turn, and publishes glass-to-glass latency telemetry via `TurnSpanTracker`.
+*   **`ReasoningStrategyRegistry`** ([reasoning/registry.py](reasoning/registry.py)): Plug-and-play strategy registry supporting:
+    *   `tree_of_thoughts` (`TreeOfThoughtsStrategy` in [reasoning/custom/tree_of_thoughts.py](reasoning/custom/tree_of_thoughts.py)): Multi-branch deliberation with speculative read-only tool execution (`SecurityGuardrail`) and two-tier result caching (`ToolResultCache`).
+    *   `symbolic_poc` (`SymbolicHeuristicReasoningStrategy` in [reasoning/custom/poc_symbolic_reasoner.py](reasoning/custom/poc_symbolic_reasoner.py)): 3-stage symbolic intent decomposition and heuristic candidate selection.
+    *   `native_thinking` (`ProviderNativeReasoningStrategy` in [reasoning/native/provider_native.py](reasoning/native/provider_native.py)): Demuxes `<think>...</think>` blocks onto `ttt.thinking` (`StreamPhase.THINKING`) while routing only style-tagged spoken text onto `ttt.response` (`StreamPhase.RESPONDING`).
+    *   `local_llm` (`LocalLLMReasoningStrategy` in [reasoning/local_llm.py](reasoning/local_llm.py)): Connects to local Ollama / vLLM / `llama.cpp` endpoints.
+*   **Microservice Entrypoint** ([service.py](service.py)):
+    ```bash
+    python -m mindmirror.llm.service
+    ```

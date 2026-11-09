@@ -47,10 +47,13 @@ def split_into_sentences(text):
     return final_chunks
 
 def set_speaking_lock(active: bool):
-    """Creates or removes the lock file to mute the mic."""
+    """Updates mic mute state via PlaybackState and cross-process lock file."""
     try:
+        from mindmirror.audio.playback import PlaybackState
+        PlaybackState.get_instance()._mic_muted = active
         if active:
-            with open(LOCK_FILE, "w") as f: f.write("active")
+            with open(LOCK_FILE, "w") as f:
+                f.write("active")
         else:
             if os.path.exists(LOCK_FILE):
                 os.remove(LOCK_FILE)
@@ -58,10 +61,13 @@ def set_speaking_lock(active: bool):
         pass
 
 def set_playback_lock(active: bool):
-    """Creates or removes the playback lock file to indicate active audio playback."""
+    """Updates playback state via PlaybackState and cross-process lock file."""
     try:
+        from mindmirror.audio.playback import PlaybackState
+        PlaybackState.get_instance()._playback_active = active
         if active:
-            with open(PLAYBACK_LOCK, "w") as f: f.write("1")
+            with open(PLAYBACK_LOCK, "w") as f:
+                f.write("1")
         else:
             if os.path.exists(PLAYBACK_LOCK):
                 os.remove(PLAYBACK_LOCK)

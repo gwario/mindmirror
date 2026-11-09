@@ -108,19 +108,32 @@ def main():
     if args.default:
         import sounddevice as sd
         try:
-            default_input_id = sd.default.device[0] if isinstance(sd.default.device, (list, tuple)) else sd.default.device
-            default_output_id = sd.default.device[1] if isinstance(sd.default.device, (list, tuple)) else sd.default.device
+            default_in_dev = sd.query_devices(kind='input')
+            default_out_dev = sd.query_devices(kind='output')
+            try:
+                default_input_id = int(sd.default.device[0])
+                if default_input_id < 0:
+                    default_input_id = default_in_dev.get('index', None)
+            except Exception:
+                default_input_id = default_in_dev.get('index', None)
+
+            try:
+                default_output_id = int(sd.default.device[1])
+                if default_output_id < 0:
+                    default_output_id = default_out_dev.get('index', None)
+            except Exception:
+                default_output_id = default_out_dev.get('index', None)
             
             input_device = default_input_id
-            input_sr = int(sd.query_devices(default_input_id)['default_samplerate'])
+            input_sr = int(default_in_dev['default_samplerate'])
             
             output_device = default_output_id
-            output_sr = int(sd.query_devices(default_output_id)['default_samplerate'])
+            output_sr = int(default_out_dev['default_samplerate'])
             
             headphones_mode = True
             
-            print(f"✅ Using Default Input: {sd.query_devices(default_input_id)['name']} @ {input_sr}Hz")
-            print(f"✅ Using Default Output: {sd.query_devices(default_output_id)['name']} @ {output_sr}Hz")
+            print(f"✅ Using Default Input: {default_in_dev['name']} @ {input_sr}Hz")
+            print(f"✅ Using Default Output: {default_out_dev['name']} @ {output_sr}Hz")
             print(f"✅ Headphones Mode: ON")
         except Exception as e:
             print(f"⚠️ Failed to load default devices via sounddevice: {e}. Falling back to manual selection.")

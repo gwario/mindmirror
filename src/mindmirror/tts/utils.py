@@ -1,10 +1,21 @@
+"""TTS coordination utilities.
+
+File-based locks (speaking.lock, playback.lock) are superseded by PlaybackState
+and message bus control topics. This module delegates to PlaybackState while
+cleaning up any legacy lock files left on disk.
+"""
+
 import os
+from mindmirror.audio.playback import PlaybackState
 from mindmirror.config import LOCK_FILE, PLAYBACK_LOCK
 
 
 def set_speaking_lock(active: bool) -> None:
-    """Creates or removes the speaking lock file to mute the mic during TTS playback."""
+    """Updates mic mute state via PlaybackState and cross-process lock file."""
     try:
+        state = PlaybackState.get_instance()
+        state._mic_muted = active
+
         if active:
             with open(LOCK_FILE, "w") as f:
                 f.write("active")
@@ -16,8 +27,11 @@ def set_speaking_lock(active: bool) -> None:
 
 
 def set_playback_lock(active: bool) -> None:
-    """Creates or removes the playback lock file to signal active audio output."""
+    """Updates playback state via PlaybackState and cross-process lock file."""
     try:
+        state = PlaybackState.get_instance()
+        state._playback_active = active
+
         if active:
             with open(PLAYBACK_LOCK, "w") as f:
                 f.write("1")

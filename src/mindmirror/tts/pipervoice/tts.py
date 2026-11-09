@@ -20,8 +20,33 @@ class PiperTTS(TTSInterface):
     Uses ONNX for fast CPU speech synthesis.
     """
 
-    def __init__(self, model_path: str = None):
-        self.model_path = model_path or config.PIPER_MODEL_PATH
+    def __init__(self, model_path: str | None = None, voice: str | None = None):
+        if model_path:
+            self.model_path = model_path
+        elif voice and os.path.exists(voice):
+            self.model_path = voice
+        else:
+            self.model_path = config.PIPER_MODEL_PATH
+        self.voice_name = voice
+        self._voice = None
+
+    def _get_voice(self):
+        if self._voice is None and os.path.exists(self.model_path):
+            self._voice = PiperVoice.load(self.model_path, use_cuda=False)
+        return self._voice
+
+    def synthesize(self, text: str, style: str = "NEUTRAL") -> list[bytes]:
+        """Pure speech synthesis returning raw 16-bit PCM chunks."""
+        voice = self._get_voice()
+        if not voice:
+            return []
+        chunks = []
+        for chunk in voice.synthesize(text):
+            audio_data = chunk.audio_float_array
+            pcm = (audio_data * 32767).clip(-32768, 32767).astype(np.int16).tobytes()
+            chunks.append(pcm)
+        return chunks
+
 
     def tts_task(self, log_queue, selected_device, text_queue, control_queue) -> None:
         """Process text from AI and send to TTS with interruption support"""

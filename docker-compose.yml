@@ -1,0 +1,251 @@
+services:
+  # ---------------------------------------------------------------------------
+  # Core Infrastructure Services (Zero Cloud Dependencies)
+  # ---------------------------------------------------------------------------
+
+  # Service 1: NATS Message Bus (Pub/Sub, Request-Reply, JetStream)
+  nats-server:
+    image: nats:2.10-alpine
+    container_name: mindmirror-nats
+    restart: unless-stopped
+    command: ["-js", "-m", "8222"]
+    ports:
+      - "4222:4222" # Client connection port
+      - "8222:8222" # HTTP monitoring dashboard
+    networks:
+      - mindmirror-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8222/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # Service 2: Valkey (Open-Source Redis Drop-in Replacement for Distributed Tool Caching & State)
+  valkey:
+    image: valkey/valkey:7.2-alpine
+    container_name: mindmirror-valkey
+    restart: unless-stopped
+    command: ["valkey-server", "--save", "60", "1", "--loglevel", "notice"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - valkey_data:/data
+    networks:
+      - mindmirror-net
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # Service 3: ChromaDB (Isolated Open-Source Vector Memory & Speaker Embeddings)
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: mindmirror-chromadb
+    restart: unless-stopped
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    networks:
+      - mindmirror-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/api/v2/heartbeat || curl -sf http://localhost:8000/api/v1/heartbeat || bash -c 'cat < /dev/null > /dev/tcp/localhost/8000'"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Service 4: SearXNG (Self-Hosted Privacy-Preserving Web Search Engine)
+  searxng:
+    image: searxng/searxng:latest
+    container_name: mindmirror-searxng
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080/
+      - BIND_ADDRESS=0.0.0.0:8080
+    networks:
+      - mindmirror-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/ || curl -sf http://localhost:8080/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # Service 5: Jaeger (Distributed Tracing, Latency Waterfall & OTLP Ingestion)
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: mindmirror-jaeger
+    restart: unless-stopped
+    ports:
+      - "16686:16686" # Web UI (Visual Waterfall Traces)
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP HTTP receiver
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - mindmirror-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:16686/ || exit 0"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # Service 6 (Optional): Local Ollama LLM Serving Engine
+  ollama:
+    image: ollama/ollama:latest
+    container_name: mindmirror-ollama
+    restart: unless-stopped
+    profiles:
+      - local-llm
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    networks:
+      - mindmirror-net
+
+  # ---------------------------------------------------------------------------
+  # Supervised MindMirror Application Microservices
+  # ---------------------------------------------------------------------------
+
+  # Service 7: STT Service (Faster-Whisper Speech-to-Text & Silero VAD)
+  mindmirror-stt:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mindmirror-stt
+    restart: unless-stopped
+    environment:
+      - BUS_TYPE=nats
+      - NATS_URL=nats://nats-server:4222
+      - WHISPER_MODEL=base.en
+      - WHISPER_DEVICE=cpu
+      - PYTHONUNBUFFERED=1
+    command: ["python", "-m", "mindmirror.stt.service"]
+    depends_on:
+      nats-server:
+        condition: service_healthy
+    networks:
+      - mindmirror-net
+
+  # Service 8: Dedicated Speaker Identification & Biometrics Service
+  mindmirror-speaker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mindmirror-speaker
+    restart: unless-stopped
+    environment:
+      - BUS_TYPE=nats
+      - NATS_URL=nats://nats-server:4222
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - VALKEY_URL=redis://valkey:6379/0
+      - SPEAKER_SIMILARITY_THRESHOLD=0.6
+      - PYTHONUNBUFFERED=1
+    command: ["python", "-m", "mindmirror.speaker.service"]
+    depends_on:
+      nats-server:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+    networks:
+      - mindmirror-net
+
+  # Service 9: Autonomous Reasoning Service (Custom / Local LLM / ToT / Symbolic PoC)
+  mindmirror-reasoning:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mindmirror-reasoning
+    restart: unless-stopped
+    environment:
+      - BUS_TYPE=nats
+      - NATS_URL=nats://nats-server:4222
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - VALKEY_URL=redis://valkey:6379/0
+      - SEARXNG_URL=http://searxng:8080
+      - JAEGER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
+      - REASONING_STRATEGY=tree_of_thoughts
+      - LOCAL_LLM_URL=http://ollama:11434
+      - PYTHONUNBUFFERED=1
+    command: ["python", "-m", "mindmirror.llm.service"]
+    depends_on:
+      nats-server:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+      searxng:
+        condition: service_healthy
+      jaeger:
+        condition: service_healthy
+    networks:
+      - mindmirror-net
+
+  # Service 10: TTS Service (Low-Latency Piper ONNX Voice Synthesis)
+  mindmirror-tts:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mindmirror-tts
+    restart: unless-stopped
+    environment:
+      - BUS_TYPE=nats
+      - NATS_URL=nats://nats-server:4222
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - PIPER_MODEL=en_GB-alan-medium
+      - PYTHONUNBUFFERED=1
+    command: ["python", "-m", "mindmirror.tts.service"]
+    depends_on:
+      nats-server:
+        condition: service_healthy
+    networks:
+      - mindmirror-net
+
+  # Service 11: Audio Host I/O Service (PipeWire / Bluetooth / File-Based Audio Bridge)
+  mindmirror-audio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mindmirror-audio
+    restart: unless-stopped
+    network_mode: "host"
+    ipc: "host"
+    devices:
+      - "/dev/snd:/dev/snd"
+    environment:
+      - PULSE_SERVER=unix:/tmp/pulseaudio.socket
+      - PIPEWIRE_RUNTIME_DIR=/tmp/pipewire
+      - BUS_TYPE=nats
+      - NATS_URL=nats://localhost:4222
+      - AUDIO_INPUT_DEVICE=bluetooth
+      - AUDIO_OUTPUT_DEVICE=bluetooth
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - /run/user/1000/pulse:/tmp/pulseaudio.socket:ro
+      - /run/user/1000/pipewire-0:/tmp/pipewire/pipewire-0:ro
+    command: ["python", "-m", "mindmirror.audio.service"]
+    depends_on:
+      nats-server:
+        condition: service_healthy
+
+volumes:
+  valkey_data:
+    driver: local
+  chroma_data:
+    driver: local
+  ollama_models:
+    driver: local
+
+networks:
+  mindmirror-net:
+    driver: bridge
